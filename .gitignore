@@ -1,0 +1,40 @@
+# IDE
+*.iml
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+
+# Gradle / 构建
+.gradle
+/build
+.externalNativeBuild
+.cxx
+*.apk
+*.ap_
+*.aab
+*.dex
+
+# 本地配置（含 SDK 路径等）
+local.properties
+
+# 签名与敏感文件（切勿提交）
+*.jks
+*.keystore
+key.properties
+
+# Kotlin / 日志 / 调试
+.kotlin/
+*.log
+*.hprof
+
+# 系统与临时
+.DS_Store
+/captures
+
+# 项目文档与资源
+docs/
+icon/
+prd/
