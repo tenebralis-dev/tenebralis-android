@@ -1,4 +1,4 @@
-# 🌌 Tenebralis Dream System【界影浮光】Kotlin Client
+# 🌌 【界影浮光】 Tenebralis Dream System Kotlin Client
 
 > "Echoes of the void, rendered in light."
 > 虚空的回响，于光影中显现。
@@ -10,7 +10,7 @@
 
 ## 📂 System Overview（系统概述）
 
-**Tenebralis（界影浮光）** 是一个以"伪 OS / 幻想终端"为交互形态的沉浸式世界观载体——不是"聊天应用"，而是**"快穿系统手机"**。
+**Tenebralis（界影浮光）** 是一个以"伪 OS / 幻想终端"为交互形态的沉浸式世界观载体——不是"聊天应用"，而是 **"快穿系统手机"**。
 
 本仓库为 **Kotlin + Jetpack Compose 原生客户端**，目标平台为 **Android（首选）** + **Windows 桌面端（Compose Multiplatform 预留）**。以统一的 Dream OS 桌面拟态体验，承载身份系统、世界档案、AI 多 Agent 叙事、任务成就、个人数据工具等完整功能闭环。
 
@@ -82,7 +82,7 @@
 1. **Clone the repository**
 
 ```bash
-git clone https://github.com/tenebralis-dev/TenebralisApp.git
+git clone https://github.com/tenebralis-dev/tenebralis-android.git
 ```
 
 2. **Environment Requirements（环境要求）**
