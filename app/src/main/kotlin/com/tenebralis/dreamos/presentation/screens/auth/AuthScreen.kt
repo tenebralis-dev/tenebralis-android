@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilledTonalButton
@@ -229,8 +230,27 @@ private fun LoginRegisterContent(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // ── 用户名输入（仅注册） ──
-                if (!uiState.isLogin) {
+                if (uiState.isLogin) {
+                    // ── 记住我（仅登录） ──
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = uiState.rememberMe,
+                            onCheckedChange = { checked ->
+                                onEvent(AuthEvent.RememberMeChanged(checked))
+                            },
+                            enabled = !uiState.isLoading
+                        )
+                        Text(
+                            text = "记住我",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(24.dp))
+                } else {
+                    // ── 用户名输入（仅注册） ──
                     OutlinedTextField(
                         value = uiState.username,
                         onValueChange = { onEvent(AuthEvent.UsernameChanged(it)) },
@@ -248,8 +268,6 @@ private fun LoginRegisterContent(
                         enabled = !uiState.isLoading
                     )
                     Spacer(modifier = Modifier.height(24.dp))
-                } else {
-                    Spacer(modifier = Modifier.height(12.dp))
                 }
 
                 // ── 提交按钮 ──

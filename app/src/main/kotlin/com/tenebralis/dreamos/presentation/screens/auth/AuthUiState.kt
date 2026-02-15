@@ -22,6 +22,7 @@ data class AuthUiState(
 
     // ── UI 交互 ──
     val isPasswordVisible: Boolean = false,
+    val rememberMe: Boolean = false,
 
     // ── OTP 重发倒计时 ──
     val resendCooldownSeconds: Int = 0 // > 0 时禁用重发按钮

@@ -17,6 +17,9 @@ sealed interface AuthEvent {
     /** 密码可见性切换 */
     data object TogglePasswordVisibility : AuthEvent
 
+    /** “记住我”勾选状态变化 */
+    data class RememberMeChanged(val rememberMe: Boolean) : AuthEvent
+
     // ── 提交操作 ──
     /** 提交登录或注册 */
     data object Submit : AuthEvent

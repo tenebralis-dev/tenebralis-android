@@ -3,25 +3,32 @@ package com.tenebralis.dreamos.presentation.screens.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenebralis.dreamos.domain.repository.AuthRepository
+import com.tenebralis.dreamos.domain.repository.RememberedCredentialRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val rememberedCredentialRepository: RememberedCredentialRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
     private var cooldownJob: Job? = null
+
+    init {
+        preloadRememberedCredential()
+    }
 
     fun onEvent(event: AuthEvent) {
         when (event) {
@@ -49,6 +56,15 @@ class AuthViewModel @Inject constructor(
 
             AuthEvent.TogglePasswordVisibility ->
                 _uiState.update { it.copy(isPasswordVisible = !it.isPasswordVisible) }
+
+            is AuthEvent.RememberMeChanged -> {
+                _uiState.update { it.copy(rememberMe = event.rememberMe) }
+                if (!event.rememberMe) {
+                    viewModelScope.launch {
+                        rememberedCredentialRepository.clearRememberedCredential()
+                    }
+                }
+            }
 
             AuthEvent.Submit -> submit()
             AuthEvent.VerifyOtp -> verifyOtp()
@@ -85,6 +101,7 @@ class AuthViewModel @Inject constructor(
                 onSuccess = {
                     if (state.isLogin) {
                         // 登录成功 → sessionState 自动触发路由跳转
+                        syncRememberedCredential(state)
                         _uiState.update { it.copy(isLoading = false) }
                     } else {
                         // 注册成功 → 进入 OTP 验证步骤
@@ -167,6 +184,35 @@ class AuthViewModel @Inject constructor(
             for (i in 60 downTo 0) {
                 _uiState.update { it.copy(resendCooldownSeconds = i) }
                 if (i > 0) delay(1000L)
+            }
+        }
+    }
+
+    private fun preloadRememberedCredential() {
+        viewModelScope.launch {
+            rememberedCredentialRepository.observeRememberedCredential()
+                .first()
+                ?.let { credential ->
+                    _uiState.update {
+                        it.copy(
+                            email = credential.email,
+                            password = credential.password,
+                            rememberMe = true
+                        )
+                    }
+                }
+        }
+    }
+
+    private fun syncRememberedCredential(state: AuthUiState) {
+        viewModelScope.launch {
+            if (state.rememberMe) {
+                rememberedCredentialRepository.saveRememberedCredential(
+                    email = state.email.trim(),
+                    password = state.password
+                )
+            } else {
+                rememberedCredentialRepository.clearRememberedCredential()
             }
         }
     }

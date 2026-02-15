@@ -1,8 +1,10 @@
 package com.tenebralis.dreamos.di
 
 import com.tenebralis.dreamos.data.repository.AuthRepositoryImpl
+import com.tenebralis.dreamos.data.repository.RememberedCredentialRepositoryImpl
 import com.tenebralis.dreamos.data.repository.UserRepositoryImpl
 import com.tenebralis.dreamos.domain.repository.AuthRepository
+import com.tenebralis.dreamos.domain.repository.RememberedCredentialRepository
 import com.tenebralis.dreamos.domain.repository.UserRepository
 import dagger.Binds
 import dagger.Module
@@ -21,6 +23,12 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindUserRepository(impl: UserRepositoryImpl): UserRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindRememberedCredentialRepository(
+        impl: RememberedCredentialRepositoryImpl
+    ): RememberedCredentialRepository
 
     // 后续 Phase 的 Repository 在此追加绑定：
     // abstract fun bindWorldRepository(impl: WorldRepositoryImpl): WorldRepository
