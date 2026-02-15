@@ -38,3 +38,9 @@ key.properties
 docs/
 icon/
 prd/
+
+# Cursor
+/.cursor/
+
+# IntelliJ / Android Studio
+/.idea/
