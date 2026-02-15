@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -29,7 +30,9 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -136,7 +139,7 @@ private fun LoginRegisterContent(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 32.dp),
+            .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -155,112 +158,135 @@ private fun LoginRegisterContent(
         )
         Spacer(modifier = Modifier.height(48.dp))
 
-        // ── 邮箱输入 ──
-        OutlinedTextField(
-            value = uiState.email,
-            onValueChange = { onEvent(AuthEvent.EmailChanged(it)) },
-            label = { Text("邮箱") },
-            leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Email,
-                imeAction = ImeAction.Next
-            ),
-            keyboardActions = KeyboardActions(
-                onNext = { focusManager.moveFocus(FocusDirection.Down) }
-            ),
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !uiState.isLoading
-        )
-        Spacer(modifier = Modifier.height(12.dp))
+        ElevatedCard(
+            modifier = Modifier
+                .widthIn(max = 480.dp)
+                .fillMaxWidth(),
+            colors = CardDefaults.elevatedCardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = if (uiState.isLogin) "欢迎回来" else "创建账号",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(24.dp))
 
-        // ── 密码输入 ──
-        OutlinedTextField(
-            value = uiState.password,
-            onValueChange = { onEvent(AuthEvent.PasswordChanged(it)) },
-            label = { Text("密码") },
-            leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-            trailingIcon = {
-                IconButton(onClick = { onEvent(AuthEvent.TogglePasswordVisibility) }) {
-                    Icon(
-                        imageVector = if (uiState.isPasswordVisible)
-                            Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                        contentDescription = if (uiState.isPasswordVisible) "隐藏密码" else "显示密码"
+                // ── 邮箱输入 ──
+                OutlinedTextField(
+                    value = uiState.email,
+                    onValueChange = { onEvent(AuthEvent.EmailChanged(it)) },
+                    label = { Text("邮箱") },
+                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Email,
+                        imeAction = ImeAction.Next
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !uiState.isLoading
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // ── 密码输入 ──
+                OutlinedTextField(
+                    value = uiState.password,
+                    onValueChange = { onEvent(AuthEvent.PasswordChanged(it)) },
+                    label = { Text("密码") },
+                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                    trailingIcon = {
+                        IconButton(onClick = { onEvent(AuthEvent.TogglePasswordVisibility) }) {
+                            Icon(
+                                imageVector = if (uiState.isPasswordVisible)
+                                    Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = if (uiState.isPasswordVisible) "隐藏密码" else "显示密码"
+                            )
+                        }
+                    },
+                    singleLine = true,
+                    visualTransformation = if (uiState.isPasswordVisible)
+                        VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = if (uiState.isLogin) ImeAction.Done else ImeAction.Next
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onNext = { focusManager.moveFocus(FocusDirection.Down) },
+                        onDone = { onEvent(AuthEvent.Submit) }
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !uiState.isLoading
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // ── 用户名输入（仅注册） ──
+                if (!uiState.isLogin) {
+                    OutlinedTextField(
+                        value = uiState.username,
+                        onValueChange = { onEvent(AuthEvent.UsernameChanged(it)) },
+                        label = { Text("用户名") },
+                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Text,
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = { onEvent(AuthEvent.Submit) }
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !uiState.isLoading
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                } else {
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
+                // ── 提交按钮 ──
+                FilledTonalButton(
+                    onClick = { onEvent(AuthEvent.Submit) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    enabled = !uiState.isLoading
+                ) {
+                    if (uiState.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Text(
+                        text = if (uiState.isLogin) "登录" else "注册",
+                        style = MaterialTheme.typography.labelLarge
                     )
                 }
-            },
-            singleLine = true,
-            visualTransformation = if (uiState.isPasswordVisible)
-                VisualTransformation.None else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Password,
-                imeAction = if (uiState.isLogin) ImeAction.Done else ImeAction.Next
-            ),
-            keyboardActions = KeyboardActions(
-                onNext = { focusManager.moveFocus(FocusDirection.Down) },
-                onDone = { onEvent(AuthEvent.Submit) }
-            ),
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !uiState.isLoading
-        )
-        Spacer(modifier = Modifier.height(12.dp))
 
-        // ── 用户名输入（仅注册） ──
-        if (!uiState.isLogin) {
-            OutlinedTextField(
-                value = uiState.username,
-                onValueChange = { onEvent(AuthEvent.UsernameChanged(it)) },
-                label = { Text("用户名") },
-                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Text,
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = { onEvent(AuthEvent.Submit) }
-                ),
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !uiState.isLoading
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-        }
+                Spacer(modifier = Modifier.height(16.dp))
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // ── 提交按钮 ──
-        FilledTonalButton(
-            onClick = { onEvent(AuthEvent.Submit) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp),
-            enabled = !uiState.isLoading
-        ) {
-            if (uiState.isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp
-                )
-                Spacer(modifier = Modifier.width(8.dp))
+                // ── 模式切换 ──
+                TextButton(
+                    onClick = { onEvent(AuthEvent.ToggleAuthMode) },
+                    enabled = !uiState.isLoading
+                ) {
+                    Text(
+                        text = if (uiState.isLogin) "还没有账号？去注册" else "已有账号？去登录",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
-            Text(
-                text = if (uiState.isLogin) "登录" else "注册",
-                style = MaterialTheme.typography.labelLarge
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // ── 模式切换 ──
-        TextButton(
-            onClick = { onEvent(AuthEvent.ToggleAuthMode) },
-            enabled = !uiState.isLoading
-        ) {
-            Text(
-                text = if (uiState.isLogin) "还没有账号？去注册" else "已有账号？去登录",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
         }
     }
 }
@@ -278,106 +304,122 @@ private fun OtpVerificationContent(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 32.dp),
+            .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // ── 返回按钮 ──
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Start
-        ) {
-            IconButton(
-                onClick = { onEvent(AuthEvent.BackFromOtp) },
-                enabled = !uiState.isLoading
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "返回"
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // ── 标题与提示 ──
-        Text(
-            text = "验证邮箱",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Medium
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = "验证码已发送至\n${uiState.email}",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // ── 验证码输入 ──
-        OutlinedTextField(
-            value = uiState.otpCode,
-            onValueChange = { value ->
-                // 限制为 6 位数字
-                if (value.length <= 6 && value.all { it.isDigit() }) {
-                    onEvent(AuthEvent.OtpCodeChanged(value))
-                }
-            },
-            label = { Text("6 位验证码") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Number,
-                imeAction = ImeAction.Done
-            ),
-            keyboardActions = KeyboardActions(
-                onDone = { onEvent(AuthEvent.VerifyOtp) }
-            ),
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !uiState.isLoading,
-            textStyle = MaterialTheme.typography.headlineSmall.copy(
-                textAlign = TextAlign.Center,
-                letterSpacing = MaterialTheme.typography.headlineSmall.letterSpacing * 2
-            )
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // ── 验证按钮 ──
-        FilledTonalButton(
-            onClick = { onEvent(AuthEvent.VerifyOtp) },
+        ElevatedCard(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp),
-            enabled = !uiState.isLoading && uiState.otpCode.length == 6
+                .widthIn(max = 480.dp)
+                .fillMaxWidth(),
+            colors = CardDefaults.elevatedCardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
         ) {
-            if (uiState.isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp
+            Column(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // ── 返回按钮 ──
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Start
+                ) {
+                    IconButton(
+                        onClick = { onEvent(AuthEvent.BackFromOtp) },
+                        enabled = !uiState.isLoading
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "返回"
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // ── 标题与提示 ──
+                Text(
+                    text = "验证邮箱",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "验证码已发送至\n${uiState.email}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // ── 验证码输入 ──
+                OutlinedTextField(
+                    value = uiState.otpCode,
+                    onValueChange = { value ->
+                        // 限制为 6 位数字
+                        if (value.length <= 6 && value.all { it.isDigit() }) {
+                            onEvent(AuthEvent.OtpCodeChanged(value))
+                        }
+                    },
+                    label = { Text("6 位验证码") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = { onEvent(AuthEvent.VerifyOtp) }
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !uiState.isLoading,
+                    textStyle = MaterialTheme.typography.headlineSmall.copy(
+                        textAlign = TextAlign.Center,
+                        letterSpacing = MaterialTheme.typography.headlineSmall.letterSpacing * 2
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // ── 验证按钮 ──
+                FilledTonalButton(
+                    onClick = { onEvent(AuthEvent.VerifyOtp) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    enabled = !uiState.isLoading && uiState.otpCode.length == 6
+                ) {
+                    if (uiState.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Text(
+                        text = "验证",
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // ── 重新发送 ──
+                OutlinedButton(
+                    onClick = { onEvent(AuthEvent.ResendOtp) },
+                    enabled = !uiState.isLoading && uiState.resendCooldownSeconds == 0
+                ) {
+                    Text(
+                        text = if (uiState.resendCooldownSeconds > 0)
+                            "重新发送 (${uiState.resendCooldownSeconds}s)"
+                        else
+                            "重新发送验证码"
+                    )
+                }
             }
-            Text(
-                text = "验证",
-                style = MaterialTheme.typography.labelLarge
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // ── 重新发送 ──
-        OutlinedButton(
-            onClick = { onEvent(AuthEvent.ResendOtp) },
-            enabled = !uiState.isLoading && uiState.resendCooldownSeconds == 0
-        ) {
-            Text(
-                text = if (uiState.resendCooldownSeconds > 0)
-                    "重新发送 (${uiState.resendCooldownSeconds}s)"
-                else
-                    "重新发送验证码"
-            )
         }
     }
 }
