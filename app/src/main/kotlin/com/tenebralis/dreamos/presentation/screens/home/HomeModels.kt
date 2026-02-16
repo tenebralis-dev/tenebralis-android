@@ -40,7 +40,7 @@ fun dreamOsHomePages(): List<List<HomeAppItem>> {
     return listOf(
         listOf(
             HomeAppItem("好感", Icons.Filled.Favorite, Screen.FeaturePlaceholder.createRoute("好感")),
-            HomeAppItem("身份", Icons.Filled.Person, Screen.Identity.route),
+            HomeAppItem("身份", Icons.Filled.Person, Screen.World.route),
             HomeAppItem("世界", Icons.Filled.Public, Screen.World.route),
             HomeAppItem("论坛", Icons.Filled.Forum, Screen.FeaturePlaceholder.createRoute("论坛")),
             HomeAppItem("商店", Icons.Filled.Storefront, Screen.FeaturePlaceholder.createRoute("商店")),
@@ -65,8 +65,8 @@ fun dreamOsHomePages(): List<List<HomeAppItem>> {
 
 fun dreamOsDockItems(): List<HomeDockItem> {
     return listOf(
-        HomeDockItem("梦境", Icons.Filled.Home, Screen.World.route),
-        HomeDockItem("对话", Icons.Filled.Chat, Screen.ChatList.route),
+        HomeDockItem("梦境", Icons.Filled.Home, Screen.DreamEntry.route),
+        HomeDockItem("对话", Icons.Filled.Chat, Screen.ChatList.createRoute(saveId = null)),
         HomeDockItem("任务", Icons.Filled.Assignment, Screen.Task.route),
         HomeDockItem("档案", Icons.Filled.AccountCircle, Screen.Profile.route)
     )

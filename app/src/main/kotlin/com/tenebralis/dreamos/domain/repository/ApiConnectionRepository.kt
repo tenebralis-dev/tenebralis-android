@@ -24,4 +24,7 @@ interface ApiConnectionRepository {
 
     /** 删除连接 */
     suspend fun delete(connectionId: String): Result<Unit>
+
+    /** 将指定连接设为当前 active（同一用户仅允许一个 active） */
+    suspend fun setActive(connectionId: String): Result<Unit>
 }

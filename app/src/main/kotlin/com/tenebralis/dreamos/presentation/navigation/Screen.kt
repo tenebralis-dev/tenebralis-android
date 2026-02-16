@@ -15,20 +15,56 @@ sealed class Screen(val route: String) {
     /** DreamOS 主界面（B3 实现） */
     data object Home : Screen("home")
 
+    /** 梦境入口（自动续梦） */
+    data object DreamEntry : Screen("dream_entry")
+
     /** 世界入口（B4 实现） */
     data object World : Screen("world")
 
     /** 身份入口（B4 实现） */
-    data object Identity : Screen("identity")
+    data object Identity : Screen("identity/{worldId}") {
+        const val ARG_WORLD_ID = "worldId"
+
+        fun createRoute(worldId: String): String {
+            return "identity/${Uri.encode(worldId)}"
+        }
+    }
 
     /** 存档入口（B4 实现） */
-    data object SaveSelect : Screen("save_select")
+    data object SaveSelect : Screen("save_select/{worldId}/{identityId}") {
+        const val ARG_WORLD_ID = "worldId"
+        const val ARG_IDENTITY_ID = "identityId"
+
+        fun createRoute(worldId: String, identityId: String): String {
+            return "save_select/${Uri.encode(worldId)}/${Uri.encode(identityId)}"
+        }
+    }
 
     /** 会话列表入口（B5 实现） */
-    data object ChatList : Screen("chat_list")
+    data object ChatList : Screen("chat_list?saveId={saveId}") {
+        const val BASE_ROUTE = "chat_list"
+        const val ARG_SAVE_ID = "saveId"
+
+        fun createRoute(saveId: String?): String {
+            val normalizedSaveId = saveId?.trim()
+            return if (normalizedSaveId.isNullOrEmpty()) {
+                BASE_ROUTE
+            } else {
+                "$BASE_ROUTE?saveId=${Uri.encode(normalizedSaveId)}"
+            }
+        }
+    }
 
     /** 会话详情入口（B5 实现） */
-    data object ChatDetail : Screen("chat_detail")
+    data object ChatDetail : Screen("chat_detail/{conversationId}") {
+        const val ARG_CONVERSATION_ID = "conversationId"
+
+        fun createRoute(conversationId: String): String {
+            val normalizedConversationId = conversationId.trim()
+            require(normalizedConversationId.isNotEmpty()) { "conversationId 不能为空" }
+            return "chat_detail/${Uri.encode(normalizedConversationId)}"
+        }
+    }
 
     /** 设置页面（本次实现） */
     data object Settings : Screen("settings")

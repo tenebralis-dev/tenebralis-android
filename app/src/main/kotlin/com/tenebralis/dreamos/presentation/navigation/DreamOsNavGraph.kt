@@ -19,7 +19,14 @@ import androidx.navigation.navArgument
 import com.tenebralis.dreamos.domain.model.SessionState
 import com.tenebralis.dreamos.presentation.screens.home.HomeScreen
 import com.tenebralis.dreamos.presentation.screens.auth.AuthScreen
+import com.tenebralis.dreamos.presentation.screens.chat.ChatDetailScreen
+import com.tenebralis.dreamos.presentation.screens.chat.ChatListScreen
+import com.tenebralis.dreamos.presentation.screens.connection.ConnectionScreen
+import com.tenebralis.dreamos.presentation.screens.dreamentry.DreamEntryScreen
+import com.tenebralis.dreamos.presentation.screens.identity.IdentityScreen
+import com.tenebralis.dreamos.presentation.screens.save.SaveSelectScreen
 import com.tenebralis.dreamos.presentation.screens.settings.SettingsScreen
+import com.tenebralis.dreamos.presentation.screens.world.WorldScreen
 
 /**
  * DreamOS 导航图
@@ -57,6 +64,17 @@ fun DreamOsNavGraph(
             )
         }
 
+        composable(Screen.DreamEntry.route) {
+            DreamEntryScreen(
+                onNavigateRoute = { route ->
+                    navController.navigate(route) {
+                        popUpTo(Screen.DreamEntry.route) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
         composable(Screen.Settings.route) {
             SettingsScreen(
                 onBackClick = { navController.popBackStack() }
@@ -64,22 +82,92 @@ fun DreamOsNavGraph(
         }
 
         composable(Screen.World.route) {
-            FeaturePlaceholderScreen(title = "世界")
+            WorldScreen(
+                onBackClick = { navController.popBackStack() },
+                onNavigateToIdentity = { worldId ->
+                    navController.navigate(Screen.Identity.createRoute(worldId)) {
+                        launchSingleTop = true
+                    }
+                }
+            )
         }
-        composable(Screen.Identity.route) {
-            FeaturePlaceholderScreen(title = "身份")
+        composable(
+            route = Screen.Identity.route,
+            arguments = listOf(
+                navArgument(Screen.Identity.ARG_WORLD_ID) {
+                    type = NavType.StringType
+                }
+            )
+        ) {
+            IdentityScreen(
+                onBackClick = { navController.popBackStack() },
+                onNavigateToSaveSelect = { worldId, identityId ->
+                    navController.navigate(
+                        Screen.SaveSelect.createRoute(
+                            worldId = worldId,
+                            identityId = identityId
+                        )
+                    ) {
+                        launchSingleTop = true
+                    }
+                }
+            )
         }
-        composable(Screen.SaveSelect.route) {
-            FeaturePlaceholderScreen(title = "存档")
+        composable(
+            route = Screen.SaveSelect.route,
+            arguments = listOf(
+                navArgument(Screen.SaveSelect.ARG_WORLD_ID) {
+                    type = NavType.StringType
+                },
+                navArgument(Screen.SaveSelect.ARG_IDENTITY_ID) {
+                    type = NavType.StringType
+                }
+            )
+        ) {
+            SaveSelectScreen(
+                onBackClick = { navController.popBackStack() },
+                onNavigateToChatList = { saveId ->
+                    navController.navigate(Screen.ChatList.createRoute(saveId)) {
+                        launchSingleTop = true
+                    }
+                }
+            )
         }
-        composable(Screen.ChatList.route) {
-            FeaturePlaceholderScreen(title = "对话列表")
+        composable(
+            route = Screen.ChatList.route,
+            arguments = listOf(
+                navArgument(Screen.ChatList.ARG_SAVE_ID) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) {
+            ChatListScreen(
+                onBackClick = { navController.popBackStack() },
+                onNavigateToChatDetail = { conversationId ->
+                    navController.navigate(Screen.ChatDetail.createRoute(conversationId)) {
+                        launchSingleTop = true
+                    }
+                }
+            )
         }
-        composable(Screen.ChatDetail.route) {
-            FeaturePlaceholderScreen(title = "对话详情")
+        composable(
+            route = Screen.ChatDetail.route,
+            arguments = listOf(
+                navArgument(Screen.ChatDetail.ARG_CONVERSATION_ID) {
+                    type = NavType.StringType
+                }
+            )
+        ) {
+            ChatDetailScreen(
+                onBackClick = { navController.popBackStack() }
+            )
         }
         composable(Screen.Connection.route) {
-            FeaturePlaceholderScreen(title = "连接")
+            ConnectionScreen(
+                onBackClick = { navController.popBackStack() }
+            )
         }
         composable(Screen.Task.route) {
             FeaturePlaceholderScreen(title = "任务")
