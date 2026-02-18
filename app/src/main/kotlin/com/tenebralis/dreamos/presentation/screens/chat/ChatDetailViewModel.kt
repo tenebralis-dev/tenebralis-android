@@ -4,16 +4,18 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenebralis.dreamos.domain.usecase.chat.GetMessagesUseCase
-import com.tenebralis.dreamos.domain.usecase.chat.NoApiKeyException
-import com.tenebralis.dreamos.domain.usecase.chat.NoConnectionException
 import com.tenebralis.dreamos.domain.usecase.chat.SendMessageUseCase
+import com.tenebralis.dreamos.domain.usecase.chat.StreamEvent
 import com.tenebralis.dreamos.domain.usecase.common.UseCaseErrorMapper
 import com.tenebralis.dreamos.presentation.navigation.Screen
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -32,6 +34,9 @@ class ChatDetailViewModel @Inject constructor(
     )
     val uiState: StateFlow<ChatDetailUiState> = _uiState.asStateFlow()
 
+    /** 当前流式生成 Job，用于支持 StopStreaming 取消 */
+    private var streamJob: Job? = null
+
     init {
         refresh()
     }
@@ -45,6 +50,7 @@ class ChatDetailViewModel @Inject constructor(
             ChatDetailEvent.Send -> sendMessage(_uiState.value.inputText.trim())
             ChatDetailEvent.RetrySend -> retrySend()
             ChatDetailEvent.RetryAiCall -> retryAiCall()
+            ChatDetailEvent.StopStreaming -> stopStreaming()
             ChatDetailEvent.ClearError ->
                 _uiState.update { it.copy(errorMessage = null) }
 
@@ -90,7 +96,6 @@ class ChatDetailViewModel @Inject constructor(
     }
 
     private fun retryAiCall() {
-        // AI 失败时，user 消息已落库，重新发送最后一条 user 消息内容
         val lastUserContent = _uiState.value.messages
             .lastOrNull { it.role == com.tenebralis.dreamos.domain.model.enums.MessageRole.USER }
             ?.content
@@ -99,9 +104,15 @@ class ChatDetailViewModel @Inject constructor(
             _uiState.update { it.copy(aiErrorMessage = "没有可重试的消息") }
             return
         }
-        // 清除 AI 错误后重新发送（会产生新的 user 消息 + AI 调用）
         _uiState.update { it.copy(aiErrorMessage = null) }
         sendMessage(lastUserContent)
+    }
+
+    private fun stopStreaming() {
+        streamJob?.cancel()
+        streamJob = null
+        // 取消后 UseCase 的 CancellationException 处理会保存部分内容
+        // UI 状态在 onCompletion 中统一清理
     }
 
     private fun sendMessage(content: String) {
@@ -112,50 +123,79 @@ class ChatDetailViewModel @Inject constructor(
         }
         if (_uiState.value.isSending || _uiState.value.isAiResponding) return
 
-        viewModelScope.launch {
+        streamJob = viewModelScope.launch {
             _uiState.update {
                 it.copy(
                     isSending = true,
                     isAiResponding = true,
                     errorMessage = null,
                     aiErrorMessage = null,
+                    streamingContent = null,
                     infoMessage = null
                 )
             }
 
-            sendMessageUseCase(
+            sendMessageUseCase.invokeStream(
                 conversationId = conversationId,
                 content = normalizedContent
-            ).fold(
-                onSuccess = { result ->
-                    _uiState.update {
-                        it.copy(
-                            isSending = false,
-                            isAiResponding = false,
-                            inputText = "",
-                            failedContent = null,
-                            aiErrorMessage = result.aiError,
-                            infoMessage = if (result.aiError == null) null else "消息已发送，但 AI 回复失败"
-                        )
+            ).catch { error ->
+                _uiState.update {
+                    it.copy(
+                        failedContent = normalizedContent,
+                        errorMessage = UseCaseErrorMapper.toMessage(error)
+                    )
+                }
+            }.onCompletion {
+                // 无论正常结束、错误或取消，统一清理流式状态
+                _uiState.update {
+                    it.copy(
+                        isSending = false,
+                        isAiResponding = false,
+                        streamingContent = null
+                    )
+                }
+                streamJob = null
+                // 刷新消息列表以获取落库的消息
+                refresh()
+            }.collect { event ->
+                when (event) {
+                    is StreamEvent.UserMessageSaved -> {
+                        _uiState.update {
+                            it.copy(
+                                isSending = false,
+                                inputText = "",
+                                failedContent = null,
+                                messages = it.messages + event.message
+                            )
+                        }
                     }
-                    refresh()
-                },
-                onFailure = { error ->
-                    val errorMsg = when (error) {
-                        is NoConnectionException -> error.message
-                        is NoApiKeyException -> error.message
-                        else -> UseCaseErrorMapper.toMessage(error)
+
+                    is StreamEvent.AiChunk -> {
+                        _uiState.update {
+                            it.copy(streamingContent = event.textSoFar)
+                        }
                     }
-                    _uiState.update {
-                        it.copy(
-                            isSending = false,
-                            isAiResponding = false,
-                            failedContent = normalizedContent,
-                            errorMessage = errorMsg
-                        )
+
+                    is StreamEvent.AiCompleted -> {
+                        _uiState.update {
+                            it.copy(
+                                streamingContent = null,
+                                messages = it.messages + event.assistant
+                            )
+                        }
+                    }
+
+                    is StreamEvent.AiError -> {
+                        _uiState.update {
+                            it.copy(
+                                aiErrorMessage = event.error,
+                                infoMessage = "消息已发送，但 AI 回复失败"
+                            )
+                        }
                     }
                 }
-            )
+            }
         }
     }
 }
+

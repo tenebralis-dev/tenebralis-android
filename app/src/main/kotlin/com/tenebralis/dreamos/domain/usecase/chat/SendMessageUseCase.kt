@@ -10,6 +10,11 @@ import com.tenebralis.dreamos.domain.service.AiChatService
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -19,6 +24,8 @@ import kotlinx.serialization.json.JsonObject
  * - user 消息**始终落库**（发送即持久化）
  * - assistant 消息**仅在 AI 成功后才落库**
  * - AI 失败时返回 [SendMessageResult.aiError]，不抛异常
+ *
+ * M4-P2 新增：[invokeStream] 支持流式 AI 回复，通过 [StreamEvent] 逐步通知 UI。
  */
 class SendMessageUseCase @Inject constructor(
     private val authRepository: AuthRepository,
@@ -30,6 +37,9 @@ class SendMessageUseCase @Inject constructor(
     private val updateConversationLastMessageUseCase: UpdateConversationLastMessageUseCase
 ) {
 
+    /**
+     * 非流式发送（M4-P1，保留兼容）。
+     */
     suspend operator fun invoke(
         conversationId: String,
         content: String
@@ -110,7 +120,154 @@ class SendMessageUseCase @Inject constructor(
         )
     }
 
+    /**
+     * 流式发送（M4-P2）。
+     *
+     * 返回 [Flow]<[StreamEvent]>，ViewModel 收集该 Flow 即可逐步更新 UI。
+     * - 支持 `Job.cancel()` 中断：中断时自动将已接收的部分内容落库为 assistant 消息。
+     * - user 消息始终优先落库，AI 失败不影响已有消息。
+     */
+    fun invokeStream(
+        conversationId: String,
+        content: String
+    ): Flow<StreamEvent> = flow {
+        val normalizedConversationId = conversationId.trim()
+        val normalizedContent = content.trim()
+        require(normalizedConversationId.isNotEmpty()) { "conversationId 不能为空" }
+        require(normalizedContent.isNotEmpty()) { "消息内容不能为空" }
+
+        val userId = authRepository.getCurrentUserId()
+            ?: throw IllegalStateException("当前未登录")
+
+        // ── 1. user 消息落库 ──
+        val userMessage = sendUserMessage(
+            userId = userId,
+            conversationId = normalizedConversationId,
+            content = normalizedContent
+        )
+        emit(StreamEvent.UserMessageSaved(userMessage))
+
+        // ── 2. 获取 active connection + API Key ──
+        val connection = apiConnectionRepository.getActive().getOrThrow()
+        if (connection == null) {
+            emit(StreamEvent.AiError("请先在设置中配置 API 连接"))
+            return@flow
+        }
+
+        val apiKey = connectionSecretRepository.getSecret(connection.id).getOrThrow()
+            ?.trim()?.takeIf { it.isNotEmpty() }
+        if (apiKey == null) {
+            emit(StreamEvent.AiError("请先保存 API Key"))
+            return@flow
+        }
+
+        // ── 3. 组装上下文 ──
+        val contextMessages = try {
+            buildChatContextUseCase(
+                conversationId = normalizedConversationId,
+                systemPrompt = connection.systemPrompt
+            ).getOrThrow()
+        } catch (e: Throwable) {
+            emit(StreamEvent.AiError("上下文组装失败：${e.message ?: "未知错误"}"))
+            return@flow
+        }
+
+        // ── 4. 流式 AI 调用 ──
+        val accumulated = StringBuilder()
+        var hasError = false
+
+        try {
+            aiChatService.chatCompletionStream(
+                connection = connection,
+                apiKey = apiKey,
+                messages = contextMessages
+            ).collect { result ->
+                // 在每个 chunk 之间检查协程是否被取消
+                currentCoroutineContext().ensureActive()
+
+                result.fold(
+                    onSuccess = { chunk ->
+                        accumulated.append(chunk)
+                        emit(StreamEvent.AiChunk(accumulated.toString()))
+                    },
+                    onFailure = { error ->
+                        hasError = true
+                        emit(StreamEvent.AiError(error.message ?: "AI 调用失败"))
+                    }
+                )
+
+                // 如果已发生错误，停止收集
+                if (hasError) return@collect
+            }
+        } catch (e: CancellationException) {
+            // 用户主动取消 → 保存已接收的部分内容
+            savePartialAssistant(
+                userId = userId,
+                conversationId = normalizedConversationId,
+                accumulated = accumulated
+            )
+            throw e // 重新抛出以正确传播取消
+        } catch (e: Throwable) {
+            emit(StreamEvent.AiError("AI 流式调用失败：${e.message ?: "未知错误"}"))
+            hasError = true
+        }
+
+        if (hasError) {
+            // AI 失败但已有部分内容 → 也保存部分内容
+            savePartialAssistant(
+                userId = userId,
+                conversationId = normalizedConversationId,
+                accumulated = accumulated
+            )
+            return@flow
+        }
+
+        // ── 5. 流正常结束：assistant 消息落库 ──
+        val finalContent = accumulated.toString().trim()
+        if (finalContent.isEmpty()) {
+            emit(StreamEvent.AiError("AI 返回了空回复"))
+            return@flow
+        }
+
+        val assistantMessage = sendAssistantMessage(
+            userId = userId,
+            conversationId = normalizedConversationId,
+            content = finalContent
+        )
+
+        // ── 6. 更新会话 lastMessageAt + summary ──
+        updateConversationLastMessageUseCase(
+            conversationId = normalizedConversationId,
+            lastMessageAt = Instant.now().toString(),
+            summary = buildSummary(finalContent)
+        ).getOrThrow()
+
+        emit(StreamEvent.AiCompleted(assistantMessage))
+    }
+
     // ── 内部辅助方法 ──
+
+    /**
+     * 保存流式生成中的部分 assistant 内容（中断或失败时使用）。
+     */
+    private suspend fun savePartialAssistant(
+        userId: String,
+        conversationId: String,
+        accumulated: StringBuilder
+    ) {
+        val partial = accumulated.toString().trim()
+        if (partial.isEmpty()) return
+
+        runCatching {
+            sendAssistantMessage(userId, conversationId, partial)
+            updateConversationLastMessageUseCase(
+                conversationId = conversationId,
+                lastMessageAt = Instant.now().toString(),
+                summary = buildSummary(partial)
+            ).getOrThrow()
+        }
+        // 保存部分消息失败不阻断主流程
+    }
 
     private suspend fun sendUserMessage(
         userId: String,
@@ -210,3 +367,5 @@ class NoConnectionException(message: String) : Exception(message)
  * 无可用 API Key 时抛出。
  */
 class NoApiKeyException(message: String) : Exception(message)
+
+

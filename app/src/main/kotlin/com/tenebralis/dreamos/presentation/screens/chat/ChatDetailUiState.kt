@@ -13,6 +13,7 @@ data class ChatDetailUiState(
     val failedContent: String? = null,
     val errorMessage: String? = null,
     val aiErrorMessage: String? = null,
+    val streamingContent: String? = null,
     val infoMessage: String? = null,
     val lastAiUsage: ChatCompletionUsage? = null
 ) {

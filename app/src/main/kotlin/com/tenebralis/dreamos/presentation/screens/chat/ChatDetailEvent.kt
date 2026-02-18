@@ -8,5 +8,6 @@ sealed interface ChatDetailEvent {
     data object RetryAiCall : ChatDetailEvent
     data object ClearError : ChatDetailEvent
     data object ClearAiError : ChatDetailEvent
+    data object StopStreaming : ChatDetailEvent
     data object ClearInfo : ChatDetailEvent
 }

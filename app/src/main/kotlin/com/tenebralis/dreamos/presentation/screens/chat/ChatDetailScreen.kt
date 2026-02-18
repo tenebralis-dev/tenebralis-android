@@ -3,7 +3,9 @@ package com.tenebralis.dreamos.presentation.screens.chat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -20,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -60,10 +64,12 @@ fun ChatDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
 
-    // 自动滚动到底部
-    LaunchedEffect(uiState.messages.size) {
-        if (uiState.messages.isNotEmpty()) {
-            listState.animateScrollToItem(uiState.messages.lastIndex)
+    // 自动滚动到底部（新消息或流式内容更新时触发）
+    val scrollTarget = uiState.messages.size + if (uiState.streamingContent != null) 1 else 0
+    LaunchedEffect(scrollTarget, uiState.streamingContent) {
+        val totalItems = uiState.messages.size + if (uiState.streamingContent != null) 1 else 0
+        if (totalItems > 0) {
+            listState.animateScrollToItem(totalItems - 1)
         }
     }
 
@@ -148,12 +154,19 @@ fun ChatDetailScreen(
                     ) { message ->
                         MessageItemCard(message = message)
                     }
+
+                    // 流式 assistant 气泡
+                    uiState.streamingContent?.let { streamingText ->
+                        item(key = "streaming_bubble") {
+                            StreamingMessageBubble(text = streamingText)
+                        }
+                    }
                 }
             }
 
-            // AI 正在回复指示器
+            // AI 正在回复指示器（仅在还没收到第一个 chunk 时显示）
             AnimatedVisibility(
-                visible = uiState.isAiResponding,
+                visible = uiState.isAiResponding && uiState.streamingContent == null,
                 enter = fadeIn(),
                 exit = fadeOut()
             ) {
@@ -239,20 +252,36 @@ fun ChatDetailScreen(
                     onSend = { viewModel.onEvent(ChatDetailEvent.Send) }
                 ),
                 trailingIcon = {
-                    IconButton(
-                        enabled = !uiState.isSending && !uiState.isAiResponding,
-                        onClick = { viewModel.onEvent(ChatDetailEvent.Send) }
-                    ) {
-                        if (uiState.isSending || uiState.isAiResponding) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp
+                    if (uiState.isAiResponding) {
+                        // 流式生成中：显示停止按钮
+                        IconButton(
+                            onClick = { viewModel.onEvent(ChatDetailEvent.StopStreaming) }
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .background(
+                                        color = MaterialTheme.colorScheme.error,
+                                        shape = RoundedCornerShape(3.dp)
+                                    )
                             )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Filled.Send,
-                                contentDescription = "发送"
-                            )
+                        }
+                    } else {
+                        IconButton(
+                            enabled = !uiState.isSending,
+                            onClick = { viewModel.onEvent(ChatDetailEvent.Send) }
+                        ) {
+                            if (uiState.isSending) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Filled.Send,
+                                    contentDescription = "发送"
+                                )
+                            }
                         }
                     }
                 }
@@ -309,6 +338,52 @@ private fun MessageItemCard(message: ConversationMessage) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StreamingMessageBubble(text: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Start
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(0.88f),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f)
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "助手",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f)
+                    )
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(12.dp),
+                        strokeWidth = 1.5.dp,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "输入中",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.bodyMedium
+                )
             }
         }
     }

@@ -7,12 +7,15 @@ import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.request.header
 import io.ktor.client.request.post
+import io.ktor.client.request.preparePost
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
+import io.ktor.utils.io.readUTF8Line
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -50,7 +53,7 @@ class AiChatServiceImpl @Inject constructor(
 
         val model = connection.defaultModel?.takeIf { it.isNotBlank() }
             ?: DEFAULT_MODEL
-        val request = buildRequest(model, messages, connection.paramsJson)
+        val request = buildRequest(model, messages, connection.paramsJson, stream = false)
         val endpoint = "${connection.baseUrl.trimEnd('/')}/chat/completions"
 
         try {
@@ -100,16 +103,94 @@ class AiChatServiceImpl @Inject constructor(
         apiKey: String,
         messages: List<ChatMessage>
     ): Flow<Result<String>> = flow {
-        // M4-P2 实现：SSE 流式解析
-        emit(Result.failure(UnsupportedOperationException("流式调用将在 M4-P2 阶段实现")))
+        require(connection.baseUrl.isNotBlank()) { "Base URL 不能为空" }
+        require(apiKey.isNotBlank()) { "API Key 不能为空" }
+        require(messages.isNotEmpty()) { "消息列表不能为空" }
+
+        val model = connection.defaultModel?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_MODEL
+        val request = buildRequest(model, messages, connection.paramsJson, stream = true)
+        val endpoint = "${connection.baseUrl.trimEnd('/')}/chat/completions"
+
+        try {
+            httpClient.preparePost(endpoint) {
+                contentType(ContentType.Application.Json)
+                header(HttpHeaders.Authorization, "Bearer $apiKey")
+                header(HttpHeaders.Accept, "text/event-stream")
+                appendTemplateHeaders(connection.headersTemplateJson)
+                setBody(json.encodeToString(ChatCompletionRequest.serializer(), request))
+            }.execute { response ->
+                if (!response.status.isSuccess()) {
+                    val responseBody = response.bodyAsText()
+                    emit(Result.failure(
+                        AiApiException(
+                            statusCode = response.status.value,
+                            message = mapHttpError(response.status.value, responseBody)
+                        )
+                    ))
+                    return@execute
+                }
+
+                val channel = response.bodyAsChannel()
+                while (!channel.isClosedForRead) {
+                    val line = channel.readUTF8Line() ?: break
+
+                    // SSE 协议：空行为事件分隔符，直接跳过
+                    if (line.isBlank()) continue
+
+                    // 仅处理 data: 开头的行
+                    if (!line.startsWith("data:")) continue
+
+                    val payload = line.removePrefix("data:").trim()
+
+                    // [DONE] 信号：流结束
+                    if (payload == "[DONE]") break
+
+                    // 解析 chunk
+                    val content = parseSseChunkContent(payload)
+                    if (content != null) {
+                        emit(Result.success(content))
+                    }
+                }
+            }
+        } catch (_: HttpRequestTimeoutException) {
+            emit(Result.failure(
+                AiApiException(statusCode = null, message = "AI 响应超时，请稍后重试")
+            ))
+        } catch (e: AiApiException) {
+            emit(Result.failure(e))
+        } catch (e: Throwable) {
+            emit(Result.failure(
+                AiApiException(
+                    statusCode = null,
+                    message = "AI 流式调用失败：${e.localizedMessage ?: "未知错误"}"
+                )
+            ))
+        }
     }
 
     // ── 内部辅助方法 ──
 
+    /**
+     * 从 SSE data 行的 JSON payload 中提取 delta.content。
+     *
+     * @return delta content（可能为 null，例如首个 chunk 只有 role）
+     */
+    internal fun parseSseChunkContent(payload: String): String? {
+        return runCatching {
+            val chunk = json.decodeFromString(
+                ChatCompletionStreamChunk.serializer(),
+                payload
+            )
+            chunk.choices.firstOrNull()?.delta?.content
+        }.getOrNull()
+    }
+
     private fun buildRequest(
         model: String,
         messages: List<ChatMessage>,
-        paramsJson: JsonObject
+        paramsJson: JsonObject,
+        stream: Boolean
     ): ChatCompletionRequest {
         return ChatCompletionRequest(
             model = model,
@@ -119,7 +200,7 @@ class AiChatServiceImpl @Inject constructor(
             topP = paramsJson.doubleParam("top_p"),
             frequencyPenalty = paramsJson.doubleParam("frequency_penalty"),
             presencePenalty = paramsJson.doubleParam("presence_penalty"),
-            stream = false
+            stream = stream
         )
     }
 
