@@ -92,10 +92,54 @@ sealed class Screen(val route: String) {
     /** 档案入口（E/F 实现） */
     data object Profile : Screen("profile")
 
+    /** 备忘管理（M6 实现） */
+    data object Notes : Screen("notes")
+
+    /** 日历管理（M6 实现） */
+    data object Calendar : Screen("calendar")
+
+    /** 番茄钟（M6 实现） */
+    data object Pomodoro : Screen("pomodoro")
+
+    /** 成就页面（M7 实现） */
+    data object Achievement : Screen("achievement")
+
+    /** 好感度页面（M7 实现） */
+    data object Affinity : Screen("affinity?worldId={worldId}") {
+        const val BASE_ROUTE = "affinity"
+        const val ARG_WORLD_ID = "worldId"
+
+        fun createRoute(worldId: String? = null): String {
+            return if (worldId.isNullOrBlank()) BASE_ROUTE
+            else "$BASE_ROUTE?worldId=${Uri.encode(worldId)}"
+        }
+    }
+
+    /** 钱包页面（M7.5 实现） */
+    data object Wallet : Screen("wallet")
+
+    /** 论坛帖子列表（M7.5 实现） */
+    data object Forum : Screen("forum")
+
+    /** 论坛帖子详情（M7.5 实现） */
+    data object ForumPostDetail : Screen("forum_post/{postId}") {
+        const val ARG_POST_ID = "postId"
+
+        fun createRoute(postId: String): String {
+            return "forum_post/${Uri.encode(postId)}"
+        }
+    }
+
+    /** 发帖页面（M7.5 实现） */
+    data object CreatePost : Screen("create_post")
+
+    /** 商店页面（M7.5 实现） */
+    data object Shop : Screen("shop")
+
     /**
      * 通用功能占位路由
      *
-     * 用于 Home 中尚未实现的功能入口（论坛/商店/番茄钟等）。
+     * 用于 Home 中尚未实现的功能入口。
      */
     data object FeaturePlaceholder : Screen("feature/{featureName}") {
         const val ARG_FEATURE_NAME = "featureName"

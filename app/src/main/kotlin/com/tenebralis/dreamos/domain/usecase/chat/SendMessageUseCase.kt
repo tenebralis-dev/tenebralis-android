@@ -1,5 +1,6 @@
 package com.tenebralis.dreamos.domain.usecase.chat
 
+import android.util.Log
 import com.tenebralis.dreamos.domain.model.ConnectionConfig
 import com.tenebralis.dreamos.domain.model.ConversationMessage
 import com.tenebralis.dreamos.domain.model.enums.MessageRole
@@ -8,6 +9,8 @@ import com.tenebralis.dreamos.domain.repository.AuthRepository
 import com.tenebralis.dreamos.domain.repository.ConnectionSecretRepository
 import com.tenebralis.dreamos.domain.repository.MessageRepository
 import com.tenebralis.dreamos.domain.service.AiChatService
+import com.tenebralis.dreamos.domain.usecase.event.GameEventParser
+import com.tenebralis.dreamos.domain.usecase.event.ProcessGameEventsUseCase
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
@@ -35,7 +38,9 @@ class SendMessageUseCase @Inject constructor(
     private val connectionSecretRepository: ConnectionSecretRepository,
     private val buildChatContextUseCase: BuildChatContextUseCase,
     private val aiChatService: AiChatService,
-    private val updateConversationLastMessageUseCase: UpdateConversationLastMessageUseCase
+    private val updateConversationLastMessageUseCase: UpdateConversationLastMessageUseCase,
+    private val gameEventParser: GameEventParser,
+    private val processGameEventsUseCase: ProcessGameEventsUseCase
 ) {
 
     /**
@@ -91,8 +96,8 @@ class SendMessageUseCase @Inject constructor(
         }
 
         val response = aiResult.getOrThrow()
-        val assistantContent = response.choices.firstOrNull()?.message?.content?.trim()
-        if (assistantContent.isNullOrEmpty()) {
+        val rawAssistantContent = response.choices.firstOrNull()?.message?.content?.trim()
+        if (rawAssistantContent.isNullOrEmpty()) {
             return@runCatching SendMessageResult(
                 userMessage = userMessage,
                 assistantMessage = null,
@@ -100,19 +105,29 @@ class SendMessageUseCase @Inject constructor(
             )
         }
 
-        // ── 5. assistant 消息落库 ──
+        // ── 5. 解析游戏事件并清理内容 ──
+        val parseResult = gameEventParser.parse(rawAssistantContent)
+        val assistantContent = parseResult.cleanContent.ifEmpty { rawAssistantContent }
+
+        // ── 6. assistant 消息落库（使用清理后的内容） ──
         val assistantMessage = sendAssistantMessage(
             userId = userId,
             conversationId = normalizedConversationId,
             content = assistantContent
         )
 
-        // ── 6. 更新会话 lastMessageAt + summary ──
+        // ── 7. 更新会话 lastMessageAt + summary ──
         updateConversationLastMessageUseCase(
             conversationId = normalizedConversationId,
             lastMessageAt = Instant.now().toString(),
             summary = buildSummary(assistantContent)
         ).getOrThrow()
+
+        // ── 8. 处理游戏事件（最佳努力，不阻断） ──
+        if (parseResult.events.isNotEmpty()) {
+            runCatching { processGameEventsUseCase(parseResult.events) }
+                .onFailure { Log.w("SendMessage", "游戏事件处理失败", it) }
+        }
 
         SendMessageResult(
             userMessage = userMessage,
@@ -189,11 +204,13 @@ class SendMessageUseCase @Inject constructor(
                 return@flow
             }
             val response = aiResult.getOrThrow()
-            val assistantContent = response.choices.firstOrNull()?.message?.content?.trim()
-            if (assistantContent.isNullOrEmpty()) {
+            val rawContent = response.choices.firstOrNull()?.message?.content?.trim()
+            if (rawContent.isNullOrEmpty()) {
                 emit(StreamEvent.AiError("AI 返回了空回复"))
                 return@flow
             }
+            val parseResult = gameEventParser.parse(rawContent)
+            val assistantContent = parseResult.cleanContent.ifEmpty { rawContent }
             val assistantMessage = sendAssistantMessage(
                 userId = userId,
                 conversationId = normalizedConversationId,
@@ -204,6 +221,10 @@ class SendMessageUseCase @Inject constructor(
                 lastMessageAt = Instant.now().toString(),
                 summary = buildSummary(assistantContent)
             ).getOrThrow()
+            if (parseResult.events.isNotEmpty()) {
+                runCatching { processGameEventsUseCase(parseResult.events) }
+                    .onFailure { Log.w("SendMessage", "游戏事件处理失败", it) }
+            }
             emit(StreamEvent.AiCompleted(assistantMessage))
             return@flow
         }
@@ -258,12 +279,15 @@ class SendMessageUseCase @Inject constructor(
             return@flow
         }
 
-        // ── 5. 流正常结束：assistant 消息落库 ──
-        val finalContent = accumulated.toString().trim()
-        if (finalContent.isEmpty()) {
+        // ── 5. 流正常结束：解析事件 + assistant 消息落库 ──
+        val rawFinalContent = accumulated.toString().trim()
+        if (rawFinalContent.isEmpty()) {
             emit(StreamEvent.AiError("AI 返回了空回复"))
             return@flow
         }
+
+        val parseResult = gameEventParser.parse(rawFinalContent)
+        val finalContent = parseResult.cleanContent.ifEmpty { rawFinalContent }
 
         val assistantMessage = sendAssistantMessage(
             userId = userId,
@@ -277,6 +301,12 @@ class SendMessageUseCase @Inject constructor(
             lastMessageAt = Instant.now().toString(),
             summary = buildSummary(finalContent)
         ).getOrThrow()
+
+        // ── 7. 处理游戏事件 ──
+        if (parseResult.events.isNotEmpty()) {
+            runCatching { processGameEventsUseCase(parseResult.events) }
+                .onFailure { Log.w("SendMessage", "游戏事件处理失败", it) }
+        }
 
         emit(StreamEvent.AiCompleted(assistantMessage))
     }

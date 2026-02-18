@@ -1,13 +1,19 @@
 package com.tenebralis.dreamos.domain.usecase.chat
 
 import com.tenebralis.dreamos.data.remote.ai.ChatMessage
+import com.tenebralis.dreamos.domain.model.enums.AiVisibility
 import com.tenebralis.dreamos.domain.model.enums.MessageRole
+import com.tenebralis.dreamos.domain.model.enums.TaskStatus
+import com.tenebralis.dreamos.domain.repository.CalendarRepository
 import com.tenebralis.dreamos.domain.repository.ConversationRepository
 import com.tenebralis.dreamos.domain.repository.GlobalMemoryRepository
 import com.tenebralis.dreamos.domain.repository.IdentityRepository
 import com.tenebralis.dreamos.domain.repository.MessageRepository
+import com.tenebralis.dreamos.domain.repository.NoteRepository
 import com.tenebralis.dreamos.domain.repository.NpcRepository
+import com.tenebralis.dreamos.domain.repository.PomodoroRepository
 import com.tenebralis.dreamos.domain.repository.SaveStateRepository
+import com.tenebralis.dreamos.domain.repository.TaskRepository
 import com.tenebralis.dreamos.domain.repository.WorldRepository
 import javax.inject.Inject
 import kotlinx.coroutines.flow.first
@@ -34,7 +40,11 @@ class BuildChatContextUseCase @Inject constructor(
     private val identityRepository: IdentityRepository,
     private val saveStateRepository: SaveStateRepository,
     private val globalMemoryRepository: GlobalMemoryRepository,
-    private val npcRepository: NpcRepository
+    private val npcRepository: NpcRepository,
+    private val noteRepository: NoteRepository,
+    private val calendarRepository: CalendarRepository,
+    private val pomodoroRepository: PomodoroRepository,
+    private val taskRepository: TaskRepository
 ) {
 
     /**
@@ -73,8 +83,17 @@ class BuildChatContextUseCase @Inject constructor(
 
         // 6. 关系层（M5，当前跳过）
 
+        // 6.5 用户个人数据（M6: 备忘 / 日历 / 番茄钟）
+        appendUserDataContext(systemParts)
+
+        // 6.6 当前活跃任务（M7+）
+        appendActiveTaskContext(systemParts)
+
         // 7. 全局记忆
         appendMemoryContext(memoryTopN, systemParts)
+
+        // 7.5 AI 事件指令格式（M7+）
+        appendGameEventInstruction(systemParts)
 
         // ── 构建消息列表 ──
         val messages = mutableListOf<ChatMessage>()
@@ -122,6 +141,7 @@ class BuildChatContextUseCase @Inject constructor(
         }.getOrNull() ?: return
 
         val sb = StringBuilder("[世界观]")
+        sb.append("\nworld_id: ").append(world.id)
         world.promptLoreText?.trim()?.takeIf { it.isNotEmpty() }?.let {
             sb.append("\n").append(it)
         }
@@ -184,6 +204,7 @@ class BuildChatContextUseCase @Inject constructor(
         }.getOrNull() ?: return
 
         val sb = StringBuilder("[NPC 设定]")
+        sb.append("\nnpc_id: ").append(npc.id)
         sb.append("\n名称: ").append(npc.name)
         npc.description?.trim()?.takeIf { it.isNotEmpty() }?.let {
             sb.append("\n简介: ").append(it)
@@ -215,6 +236,42 @@ class BuildChatContextUseCase @Inject constructor(
         parts += sb.toString()
     }
 
+    // ── 用户个人数据上下文（M6）──
+
+    private suspend fun appendUserDataContext(
+        parts: MutableList<String>
+    ) {
+        val visibleSet = setOf(
+            AiVisibility.ASSISTANT,
+            AiVisibility.WORLD_CONTEXT,
+            AiVisibility.SAVE_CONTEXT
+        )
+
+        // 备忘
+        val notes = runCatching {
+            noteRepository.getForContext(visibleSet, limit = 5).getOrThrow()
+        }.getOrNull()
+        if (!notes.isNullOrEmpty()) {
+            parts += "[用户备忘]\n" + notes.joinToString("\n") { "- ${it.title}: ${it.content}" }
+        }
+
+        // 日历（最近 7 天）
+        val events = runCatching {
+            calendarRepository.getForContext(visibleSet, limit = 5).getOrThrow()
+        }.getOrNull()
+        if (!events.isNullOrEmpty()) {
+            parts += "[用户日程]\n" + events.joinToString("\n") { "- ${it.title} (${it.startAt})" }
+        }
+
+        // 番茄钟（今日）
+        val sessions = runCatching {
+            pomodoroRepository.getTodaySessions().first().getOrThrow()
+        }.getOrNull()
+        if (!sessions.isNullOrEmpty()) {
+            parts += "[今日专注] 已完成 ${sessions.size} 个番茄钟，共 ${sessions.sumOf { it.durationMinutes }} 分钟"
+        }
+    }
+
     // ── 工具方法 ──
 
     private fun flattenJson(json: JsonObject): String {
@@ -229,4 +286,40 @@ class BuildChatContextUseCase @Inject constructor(
     }
 
     private fun JsonObject.isNotEmpty(): Boolean = this.entries.isNotEmpty()
+
+    // ── M7+ 活跃任务上下文 ──
+
+    private suspend fun appendActiveTaskContext(parts: MutableList<String>) {
+        val userTasks = runCatching {
+            taskRepository.getUserTasks(TaskStatus.IN_PROGRESS).first().getOrThrow()
+        }.getOrNull()
+
+        if (userTasks.isNullOrEmpty()) return
+
+        val sb = StringBuilder("[当前活跃任务]")
+        userTasks.take(5).forEach { ut ->
+            val name = ut.task?.name ?: "(未知任务)"
+            val taskId = ut.taskId
+            val desc = ut.task?.description?.take(60) ?: ""
+            val progress = "${(ut.progressValue * 100).toInt()}%"
+            sb.append("\n- $name（task_id: $taskId, 进度: $progress）")
+            if (desc.isNotEmpty()) sb.append("  $desc")
+        }
+        parts += sb.toString()
+    }
+
+    private fun appendGameEventInstruction(parts: MutableList<String>) {
+        parts += """
+[游戏事件指令]
+当你认为用户的行为应该推进任务进度或影响 NPC 好感时，在回复末尾添加事件标记（用户不可见）：
+[GAME_EVENT]{"type":"task_progress","task_id":"<从[当前活跃任务]中复制task_id>","delta":0.2}[/GAME_EVENT]
+[GAME_EVENT]{"type":"affinity_change","npc_id":"<从[NPC 设定]中复制npc_id>","world_id":"<从[世界观]中获取>","delta":5}[/GAME_EVENT]
+规则：
+- task_id / npc_id / world_id 必须使用上方上下文中提供的真实 ID，严禁编造
+- delta 范围：task_progress 为 0.0~1.0，affinity_change 为 -20~20
+- 仅当用户行为明确相关时才添加，不要每次都添加
+- 一条回复可包含多个事件标记
+- 如果上下文中没有活跃任务或 NPC 信息，则不要添加对应事件
+        """.trimIndent()
+    }
 }

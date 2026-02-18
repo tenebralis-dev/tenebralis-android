@@ -39,19 +39,19 @@ data class HomeDockItem(
 fun dreamOsHomePages(): List<List<HomeAppItem>> {
     return listOf(
         listOf(
-            HomeAppItem("好感", Icons.Filled.Favorite, Screen.FeaturePlaceholder.createRoute("好感")),
+            HomeAppItem("好感", Icons.Filled.Favorite, Screen.Affinity.createRoute()),
             HomeAppItem("身份", Icons.Filled.Person, Screen.World.route),
             HomeAppItem("任务", Icons.Filled.Assignment, Screen.Task.route),
-            HomeAppItem("论坛", Icons.Filled.Forum, Screen.FeaturePlaceholder.createRoute("论坛")),
-            HomeAppItem("商店", Icons.Filled.Storefront, Screen.FeaturePlaceholder.createRoute("商店")),
-            HomeAppItem("成就", Icons.Filled.EmojiEvents, Screen.FeaturePlaceholder.createRoute("成就"))
+            HomeAppItem("论坛", Icons.Filled.Forum, Screen.Forum.route),
+            HomeAppItem("商店", Icons.Filled.Storefront, Screen.Shop.route),
+            HomeAppItem("成就", Icons.Filled.EmojiEvents, Screen.Achievement.route)
         ),
         listOf(
-            HomeAppItem("备忘", Icons.Filled.Description, Screen.FeaturePlaceholder.createRoute("备忘")),
-            HomeAppItem("账本", Icons.Filled.AccountBalanceWallet, Screen.FeaturePlaceholder.createRoute("账本")),
+            HomeAppItem("备忘", Icons.Filled.Description, Screen.Notes.route),
+            HomeAppItem("钱包", Icons.Filled.AccountBalanceWallet, Screen.Wallet.route),
             HomeAppItem("相册", Icons.Filled.PhotoLibrary, Screen.FeaturePlaceholder.createRoute("相册")),
-            HomeAppItem("日历", Icons.Filled.Event, Screen.FeaturePlaceholder.createRoute("日历")),
-            HomeAppItem("番茄钟", Icons.Filled.Timer, Screen.FeaturePlaceholder.createRoute("番茄钟")),
+            HomeAppItem("日历", Icons.Filled.Event, Screen.Calendar.route),
+            HomeAppItem("番茄钟", Icons.Filled.Timer, Screen.Pomodoro.route),
             HomeAppItem("音乐", Icons.Filled.MusicNote, Screen.FeaturePlaceholder.createRoute("音乐"))
         ),
         listOf(

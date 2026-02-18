@@ -183,9 +183,36 @@ fun DreamOsNavGraph(
                 onBackClick = { navController.popBackStack() }
             )
         }
+        // ─── 任务（M7）──────────────────────────────────────
         composable(Screen.Task.route) {
-            FeaturePlaceholderScreen(title = "任务")
+            com.tenebralis.dreamos.presentation.screens.task.TaskScreen(
+                onBack = { navController.popBackStack() }
+            )
         }
+
+        // ─── 成就（M7）──────────────────────────────────────
+        composable(Screen.Achievement.route) {
+            com.tenebralis.dreamos.presentation.screens.achievement.AchievementScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        // ─── 好感度（M7）────────────────────────────────────
+        composable(
+            route = Screen.Affinity.route,
+            arguments = listOf(
+                navArgument(Screen.Affinity.ARG_WORLD_ID) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) {
+            com.tenebralis.dreamos.presentation.screens.affinity.AffinityScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
         composable(Screen.Profile.route) {
             FeaturePlaceholderScreen(title = "档案")
         }
@@ -194,6 +221,77 @@ fun DreamOsNavGraph(
         composable(Screen.Memory.route) {
             com.tenebralis.dreamos.presentation.screens.memory.MemoryScreen(
                 onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        // ─── 备忘管理（M6）──────────────────────────────────
+        composable(Screen.Notes.route) {
+            com.tenebralis.dreamos.presentation.screens.notes.NoteScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        // ─── 日历管理（M6）──────────────────────────────────
+        composable(Screen.Calendar.route) {
+            com.tenebralis.dreamos.presentation.screens.calendar.CalendarScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        // ─── 番茄钟（M6）────────────────────────────────────
+        composable(Screen.Pomodoro.route) {
+            com.tenebralis.dreamos.presentation.screens.pomodoro.PomodoroScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        // ─── 钱包（M7.5）──────────────────────────────────────
+        composable(Screen.Wallet.route) {
+            com.tenebralis.dreamos.presentation.screens.wallet.WalletScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        // ─── 论坛（M7.5）──────────────────────────────────────
+        composable(Screen.Forum.route) {
+            com.tenebralis.dreamos.presentation.screens.forum.ForumScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToPost = { postId ->
+                    navController.navigate(Screen.ForumPostDetail.createRoute(postId)) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateToCreate = {
+                    navController.navigate(Screen.CreatePost.route) {
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
+        composable(
+            route = Screen.ForumPostDetail.route,
+            arguments = listOf(
+                navArgument(Screen.ForumPostDetail.ARG_POST_ID) {
+                    type = NavType.StringType
+                }
+            )
+        ) {
+            com.tenebralis.dreamos.presentation.screens.forum.ForumPostDetailScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.CreatePost.route) {
+            com.tenebralis.dreamos.presentation.screens.forum.CreatePostScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        // ─── 商店（M7.5）──────────────────────────────────────
+        composable(Screen.Shop.route) {
+            com.tenebralis.dreamos.presentation.screens.shop.ShopScreen(
+                onBack = { navController.popBackStack() }
             )
         }
 
