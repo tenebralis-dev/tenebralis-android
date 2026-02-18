@@ -58,6 +58,7 @@ class ConnectionViewModel @Inject constructor(
         when (event) {
             ConnectionEvent.Refresh -> refreshConnections()
             ConnectionEvent.StartCreate -> startCreateMode()
+            is ConnectionEvent.StartCreateWithPreset -> startCreateWithPreset(event.serviceType)
             is ConnectionEvent.EditConnection -> startEditMode(event.connectionId)
 
             // ── 基本信息 ──
@@ -209,6 +210,22 @@ class ConnectionViewModel @Inject constructor(
             it.copy(
                 editingConnectionId = null,
                 form = ConnectionFormState(),
+                testResult = null,
+                errorMessage = null,
+                isFormVisible = true
+            )
+        }
+    }
+
+    private fun startCreateWithPreset(serviceType: ServiceType) {
+        _uiState.update {
+            it.copy(
+                editingConnectionId = null,
+                form = ConnectionFormState(
+                    name = serviceType.displayName,
+                    serviceType = serviceType,
+                    baseUrl = serviceType.defaultBaseUrl.orEmpty()
+                ),
                 testResult = null,
                 errorMessage = null,
                 isFormVisible = true
@@ -476,7 +493,7 @@ class ConnectionViewModel @Inject constructor(
         ConnectionDraft(
             name = form.name,
             serviceType = form.serviceType.serialName,
-            baseUrl = form.baseUrl,
+            baseUrl = form.baseUrl.trim().trimEnd('/'),
             defaultModel = form.defaultModel,
             systemPrompt = form.systemPrompt,
             paramsJson = paramsJson,

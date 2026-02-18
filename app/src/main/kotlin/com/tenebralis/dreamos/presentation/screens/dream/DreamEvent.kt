@@ -30,4 +30,7 @@ sealed interface DreamEvent {
 
     /** 切换上下文面板展开/折叠 */
     data object ToggleContext : DreamEvent
+
+    /** 中断流式生成 */
+    data object StopStreaming : DreamEvent
 }

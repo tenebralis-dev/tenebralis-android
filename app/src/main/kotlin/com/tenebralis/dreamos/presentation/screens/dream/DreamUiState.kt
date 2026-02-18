@@ -38,7 +38,10 @@ data class DreamUiState(
     val isContextExpanded: Boolean = true,
 
     /** 上次发送失败的内容 */
-    val failedContent: String? = null
+    val failedContent: String? = null,
+
+    /** 流式文本（打字机效果，非空表示正在流式接收） */
+    val streamingContent: String = ""
 ) {
     val isReady: Boolean get() = session != null && !isInitializing
     val emptyState: Boolean get() = isReady && messages.isEmpty()

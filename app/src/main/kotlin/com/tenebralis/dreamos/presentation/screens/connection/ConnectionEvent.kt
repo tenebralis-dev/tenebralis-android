@@ -5,6 +5,7 @@ import com.tenebralis.dreamos.domain.model.ServiceType
 sealed interface ConnectionEvent {
     data object Refresh : ConnectionEvent
     data object StartCreate : ConnectionEvent
+    data class StartCreateWithPreset(val serviceType: ServiceType) : ConnectionEvent
     data class EditConnection(val connectionId: String) : ConnectionEvent
 
     // ── 基本信息 ──

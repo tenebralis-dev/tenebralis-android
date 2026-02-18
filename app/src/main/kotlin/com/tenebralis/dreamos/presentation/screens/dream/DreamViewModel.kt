@@ -6,17 +6,19 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenebralis.dreamos.domain.usecase.chat.GetMessagesUseCase
-import com.tenebralis.dreamos.domain.usecase.chat.NoApiKeyException
-import com.tenebralis.dreamos.domain.usecase.chat.NoConnectionException
 import com.tenebralis.dreamos.domain.usecase.chat.SendMessageUseCase
+import com.tenebralis.dreamos.domain.usecase.chat.StreamEvent
 import com.tenebralis.dreamos.domain.usecase.common.UseCaseErrorMapper
 import com.tenebralis.dreamos.domain.usecase.dream.EnterDreamUseCase
 import com.tenebralis.dreamos.presentation.navigation.Screen
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -37,6 +39,9 @@ class DreamViewModel @Inject constructor(
     /** 已初始化的 conversationId，由 EnterDream 设置 */
     private var conversationId: String? = null
 
+    /** 当前流式生成 Job，用于支持 StopStreaming 取消 */
+    private var streamJob: Job? = null
+
     init {
         initializeDream()
     }
@@ -47,6 +52,7 @@ class DreamViewModel @Inject constructor(
             DreamEvent.Send -> sendMessage(_uiState.value.inputText.trim())
             DreamEvent.RetrySend -> retrySend()
             DreamEvent.RetryAiCall -> retryAiCall()
+            DreamEvent.StopStreaming -> stopStreaming()
             DreamEvent.ClearAiError ->
                 _uiState.update { it.copy(aiErrorMessage = null) }
             DreamEvent.ClearError ->
@@ -111,6 +117,15 @@ class DreamViewModel @Inject constructor(
         }
     }
 
+    // ─── 流式中断 ───────────────────────────────────────────
+
+    private fun stopStreaming() {
+        streamJob?.cancel()
+        streamJob = null
+        // 取消后 UseCase 的 CancellationException 处理会保存部分内容
+        // UI 状态在 onCompletion 中统一清理
+    }
+
     // ─── 发送消息 ───────────────────────────────────────────
 
     private fun retrySend() {
@@ -148,50 +163,78 @@ class DreamViewModel @Inject constructor(
         }
         if (_uiState.value.isSending || _uiState.value.isAiResponding) return
 
-        viewModelScope.launch {
+        streamJob = viewModelScope.launch {
             _uiState.update {
                 it.copy(
                     isSending = true,
                     isAiResponding = true,
                     errorMessage = null,
                     aiErrorMessage = null,
+                    streamingContent = "",
                     infoMessage = null
                 )
             }
 
-            sendMessageUseCase(
+            sendMessageUseCase.invokeStream(
                 conversationId = cid,
                 content = normalizedContent
-            ).fold(
-                onSuccess = { result ->
-                    _uiState.update {
-                        it.copy(
-                            isSending = false,
-                            isAiResponding = false,
-                            inputText = "",
-                            failedContent = null,
-                            aiErrorMessage = result.aiError,
-                            infoMessage = if (result.aiError == null) null else "消息已发送，但叙事者回复失败"
-                        )
+            ).catch { error ->
+                _uiState.update {
+                    it.copy(
+                        failedContent = normalizedContent,
+                        errorMessage = UseCaseErrorMapper.toMessage(error)
+                    )
+                }
+            }.onCompletion {
+                // 无论正常结束、错误或取消，统一清理流式状态
+                _uiState.update {
+                    it.copy(
+                        isSending = false,
+                        isAiResponding = false,
+                        streamingContent = ""
+                    )
+                }
+                streamJob = null
+                // 刷新消息列表以获取落库的消息
+                refreshMessages()
+            }.collect { event ->
+                when (event) {
+                    is StreamEvent.UserMessageSaved -> {
+                        _uiState.update {
+                            it.copy(
+                                isSending = false,
+                                inputText = "",
+                                failedContent = null,
+                                messages = it.messages + event.message
+                            )
+                        }
                     }
-                    refreshMessages()
-                },
-                onFailure = { error ->
-                    val errorMsg = when (error) {
-                        is NoConnectionException -> error.message
-                        is NoApiKeyException -> error.message
-                        else -> UseCaseErrorMapper.toMessage(error)
+
+                    is StreamEvent.AiChunk -> {
+                        _uiState.update {
+                            it.copy(streamingContent = event.textSoFar)
+                        }
                     }
-                    _uiState.update {
-                        it.copy(
-                            isSending = false,
-                            isAiResponding = false,
-                            failedContent = normalizedContent,
-                            errorMessage = errorMsg
-                        )
+
+                    is StreamEvent.AiCompleted -> {
+                        _uiState.update {
+                            it.copy(
+                                streamingContent = "",
+                                messages = it.messages + event.assistant
+                            )
+                        }
+                    }
+
+                    is StreamEvent.AiError -> {
+                        _uiState.update {
+                            it.copy(
+                                aiErrorMessage = event.error,
+                                infoMessage = "消息已发送，但叙事者回复失败"
+                            )
+                        }
                     }
                 }
-            )
+            }
         }
     }
 

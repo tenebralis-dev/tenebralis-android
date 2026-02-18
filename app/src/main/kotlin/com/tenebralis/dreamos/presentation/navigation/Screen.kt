@@ -86,6 +86,9 @@ sealed class Screen(val route: String) {
     /** 任务入口（E 实现） */
     data object Task : Screen("task")
 
+    /** 记忆管理页面（M5 实现） */
+    data object Memory : Screen("memory")
+
     /** 档案入口（E/F 实现） */
     data object Profile : Screen("profile")
 

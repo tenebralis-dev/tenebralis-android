@@ -13,7 +13,7 @@ import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
-import io.ktor.http.contentType
+import io.ktor.http.content.TextContent
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.readUTF8Line
 import javax.inject.Inject
@@ -58,11 +58,13 @@ class AiChatServiceImpl @Inject constructor(
 
         try {
             val response = httpClient.post(endpoint) {
-                contentType(ContentType.Application.Json)
                 header(HttpHeaders.Authorization, "Bearer $apiKey")
                 header(HttpHeaders.Accept, "application/json")
                 appendTemplateHeaders(connection.headersTemplateJson)
-                setBody(json.encodeToString(ChatCompletionRequest.serializer(), request))
+                setBody(TextContent(
+                    json.encodeToString(ChatCompletionRequest.serializer(), request),
+                    ContentType.Application.Json
+                ))
             }
 
             val statusCode = response.status.value
@@ -114,11 +116,13 @@ class AiChatServiceImpl @Inject constructor(
 
         try {
             httpClient.preparePost(endpoint) {
-                contentType(ContentType.Application.Json)
                 header(HttpHeaders.Authorization, "Bearer $apiKey")
                 header(HttpHeaders.Accept, "text/event-stream")
                 appendTemplateHeaders(connection.headersTemplateJson)
-                setBody(json.encodeToString(ChatCompletionRequest.serializer(), request))
+                setBody(TextContent(
+                    json.encodeToString(ChatCompletionRequest.serializer(), request),
+                    ContentType.Application.Json
+                ))
             }.execute { response ->
                 if (!response.status.isSuccess()) {
                     val responseBody = response.bodyAsText()

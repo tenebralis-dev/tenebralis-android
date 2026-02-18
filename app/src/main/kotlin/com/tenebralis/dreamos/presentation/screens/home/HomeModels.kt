@@ -57,7 +57,7 @@ fun dreamOsHomePages(): List<List<HomeAppItem>> {
         listOf(
             HomeAppItem("自定义", Icons.Filled.Tune, Screen.FeaturePlaceholder.createRoute("自定义")),
             HomeAppItem("连接", Icons.Filled.Link, Screen.Connection.route),
-            HomeAppItem("记忆", Icons.Filled.Bookmark, Screen.FeaturePlaceholder.createRoute("记忆")),
+            HomeAppItem("记忆", Icons.Filled.Bookmark, Screen.Memory.route),
             HomeAppItem("设置", Icons.Filled.Settings, Screen.Settings.route)
         )
     )

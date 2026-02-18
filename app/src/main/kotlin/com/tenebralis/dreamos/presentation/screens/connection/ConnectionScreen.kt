@@ -98,10 +98,10 @@ fun ConnectionScreen(
         }
     }
 
-    val deletingConnectionName = uiState.connections
+    val deletingConnection = uiState.connections
         .firstOrNull { it.id == uiState.pendingDeleteConnectionId }
-        ?.name
-        .orEmpty()
+    val deletingConnectionName = deletingConnection?.name.orEmpty()
+    val isDeletingActiveConnection = deletingConnection?.isActive == true
 
     Scaffold(
         topBar = {
@@ -163,6 +163,7 @@ fun ConnectionScreen(
 
             ConnectionListSection(
                 state = uiState,
+                onEvent = viewModel::onEvent,
                 onEdit = { id -> viewModel.onEvent(ConnectionEvent.EditConnection(id)) },
                 onSetDefault = { id ->
                     viewModel.onEvent(ConnectionEvent.EditConnection(id))
@@ -190,6 +191,14 @@ fun ConnectionScreen(
 
     // ── 删除确认对话框 ──
     if (uiState.pendingDeleteConnectionId != null) {
+        val deleteMessage = buildString {
+            append("确认删除连接「${deletingConnectionName.ifBlank { "未命名连接" }}」吗？")
+            if (isDeletingActiveConnection) {
+                append("\n\n⚠️ 这是当前默认连接，删除后需重新选择一个连接才能使用 AI 功能。")
+            }
+            append("\n\n已保存的本地 API Key 也会被清除。")
+        }
+
         AlertDialog(
             onDismissRequest = {
                 if (!uiState.isDeleting) {
@@ -197,9 +206,7 @@ fun ConnectionScreen(
                 }
             },
             title = { Text("删除连接") },
-            text = {
-                Text("确认删除连接「${deletingConnectionName.ifBlank { "未命名连接" }}」吗？已保存的本地 API Key 也会被清除。")
-            },
+            text = { Text(deleteMessage) },
             confirmButton = {
                 TextButton(
                     enabled = !uiState.isDeleting,
@@ -234,12 +241,13 @@ fun ConnectionScreen(
 @Composable
 private fun ConnectionListSection(
     state: ConnectionUiState,
+    onEvent: (ConnectionEvent) -> Unit,
     onEdit: (String) -> Unit,
     onSetDefault: (String) -> Unit,
     onDelete: (String) -> Unit
 ) {
     if (state.connections.isEmpty() && !state.isLoading) {
-        EmptyConnectionGuide()
+        EmptyConnectionGuide(onEvent = onEvent)
         return
     }
 
@@ -266,7 +274,7 @@ private fun ConnectionListSection(
 }
 
 @Composable
-private fun EmptyConnectionGuide() {
+private fun EmptyConnectionGuide(onEvent: (ConnectionEvent) -> Unit) {
     Card(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
@@ -286,15 +294,28 @@ private fun EmptyConnectionGuide() {
                 fontWeight = FontWeight.SemiBold
             )
             Text(
-                text = "连接是与 AI 服务通信的桥梁。点击右下角 + 按钮创建第一个连接。",
+                text = "连接是与 AI 服务通信的桥梁。选择一个服务快速开始，或点击右下角 + 自定义创建。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Text(
-                text = "支持: OpenAI / Claude / Gemini / 兼容中转站",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+
+            // 预设快速开始按钮
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                ServiceType.entries.forEach { type ->
+                    OutlinedButton(
+                        onClick = { onEvent(ConnectionEvent.StartCreateWithPreset(type)) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = type.displayName +
+                                (type.defaultBaseUrl?.let { " · $it" } ?: "")
+                        )
+                    }
+                }
+            }
         }
     }
 }

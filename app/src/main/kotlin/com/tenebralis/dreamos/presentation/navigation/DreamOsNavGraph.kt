@@ -189,6 +189,15 @@ fun DreamOsNavGraph(
         composable(Screen.Profile.route) {
             FeaturePlaceholderScreen(title = "档案")
         }
+
+        // ─── 记忆管理 ────────────────────────────────────────
+        composable(Screen.Memory.route) {
+            com.tenebralis.dreamos.presentation.screens.memory.MemoryScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        // ─── 通用功能占位 ────────────────────────────────────
         composable(
             route = Screen.FeaturePlaceholder.route,
             arguments = listOf(

@@ -6,6 +6,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.Card
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -45,10 +47,12 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -76,10 +80,31 @@ fun DreamScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
 
-    // 自动滚动到底部
+    // 判断用户是否在底部附近（允许手动滚动时不强制回拉）
+    val isUserNearBottom by remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()
+            if (lastVisibleItem == null) true
+            else lastVisibleItem.index >= layoutInfo.totalItemsCount - 2
+        }
+    }
+
+    // 新消息到达时滚到底部
     LaunchedEffect(uiState.messages.size) {
         if (uiState.messages.isNotEmpty()) {
-            listState.animateScrollToItem(uiState.messages.lastIndex)
+            val targetIndex = uiState.messages.size +
+                if (uiState.streamingContent.isNotEmpty()) 0 else -1
+            if (targetIndex >= 0) listState.animateScrollToItem(targetIndex)
+        }
+    }
+
+    // 流式内容增长时，仅在用户处于底部区域时跟随滚动
+    LaunchedEffect(uiState.streamingContent) {
+        if (uiState.streamingContent.isNotEmpty() && isUserNearBottom) {
+            val lastIdx = listState.layoutInfo.totalItemsCount - 1
+            // scrollOffset 设大值，使 LazyColumn 滚过卡片顶部、露出卡片底部新文本
+            if (lastIdx >= 0) listState.animateScrollToItem(lastIdx, scrollOffset = 100000)
         }
     }
 
@@ -187,12 +212,22 @@ fun DreamScreen(
                     ) { message ->
                         NarrativeMessageItem(message = message)
                     }
+
+                    // ─── 流式叙事卡片 ────────────────────────
+                    if (uiState.streamingContent.isNotEmpty()) {
+                        item(key = "streaming_narrative") {
+                            StreamingNarrativeItem(
+                                content = uiState.streamingContent,
+                                onStop = { viewModel.onEvent(DreamEvent.StopStreaming) }
+                            )
+                        }
+                    }
                 }
             }
 
-            // ─── AI 正在回复 ─────────────────────────────────
+            // ─── AI 正在回复（流式已有内容时不显示 loading 指示器） ──
             AnimatedVisibility(
-                visible = uiState.isAiResponding,
+                visible = uiState.isAiResponding && uiState.streamingContent.isEmpty(),
                 enter = fadeIn(),
                 exit = fadeOut()
             ) {
@@ -491,6 +526,69 @@ private fun NarrativeMessageItem(message: ConversationMessage) {
                     ),
                 color = MaterialTheme.colorScheme.onSurface
             )
+        }
+    }
+}
+
+/**
+ * 流式叙事卡片 — 打字机效果，带停止按钮
+ */
+@Composable
+private fun StreamingNarrativeItem(
+    content: String,
+    onStop: () -> Unit
+) {
+    val containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+    val shape = RoundedCornerShape(
+        topStart = 12.dp, topEnd = 12.dp,
+        bottomStart = 4.dp, bottomEnd = 12.dp
+    )
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.Start
+    ) {
+        // 角色标签
+        Text(
+            text = "叙事者",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f),
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .clip(shape)
+                .background(containerColor)
+                .padding(horizontal = 14.dp, vertical = 10.dp)
+        ) {
+            Text(
+                text = content,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontStyle = FontStyle.Normal,
+                    lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.15
+                ),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+
+        // 停止按钮
+        TextButton(
+            onClick = onStop,
+            modifier = Modifier.padding(start = 4.dp, top = 2.dp),
+            colors = ButtonDefaults.textButtonColors(
+                contentColor = MaterialTheme.colorScheme.error
+            )
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Stop,
+                contentDescription = "停止",
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.padding(horizontal = 2.dp))
+            Text("停止", style = MaterialTheme.typography.labelMedium)
         }
     }
 }
