@@ -21,7 +21,7 @@ class UpdateConnectionUseCase @Inject constructor(
             systemPrompt = draft.systemPrompt?.trim()?.takeIf { it.isNotEmpty() },
             paramsJson = draft.paramsJson,
             headersTemplateJson = draft.headersTemplateJson,
-            configJson = draft.configJson
+            configJson = draft.toConfigJsonObject()
         )
 
         validator.validate(updated).getOrThrow()

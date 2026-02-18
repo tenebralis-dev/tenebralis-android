@@ -1,5 +1,6 @@
 package com.tenebralis.dreamos.domain.usecase.connection
 
+import com.tenebralis.dreamos.domain.model.ConnectionConfig
 import kotlinx.serialization.json.JsonObject
 
 data class ConnectionDraft(
@@ -10,5 +11,8 @@ data class ConnectionDraft(
     val systemPrompt: String?,
     val paramsJson: JsonObject,
     val headersTemplateJson: JsonObject,
-    val configJson: JsonObject = JsonObject(emptyMap())
-)
+    val config: ConnectionConfig = ConnectionConfig()
+) {
+    /** 序列化 config 为 JsonObject，供 Repository 使用 */
+    fun toConfigJsonObject(): JsonObject = config.toJsonObject()
+}

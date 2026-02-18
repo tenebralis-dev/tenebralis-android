@@ -3,6 +3,8 @@ package com.tenebralis.dreamos.presentation.screens.connection
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenebralis.dreamos.domain.model.ApiConnection
+import com.tenebralis.dreamos.domain.model.ConnectionConfig
+import com.tenebralis.dreamos.domain.model.ServiceType
 import com.tenebralis.dreamos.domain.usecase.connection.ConnectionDraft
 import com.tenebralis.dreamos.domain.usecase.connection.CreateConnectionUseCase
 import com.tenebralis.dreamos.domain.usecase.connection.DeleteConnectionUseCase
@@ -13,6 +15,7 @@ import com.tenebralis.dreamos.domain.usecase.connection.SetActiveConnectionUseCa
 import com.tenebralis.dreamos.domain.usecase.connection.TestConnectionUseCase
 import com.tenebralis.dreamos.domain.usecase.connection.UpdateConnectionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.net.URI
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +25,10 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 @HiltViewModel
 class ConnectionViewModel @Inject constructor(
@@ -53,30 +60,81 @@ class ConnectionViewModel @Inject constructor(
             ConnectionEvent.StartCreate -> startCreateMode()
             is ConnectionEvent.EditConnection -> startEditMode(event.connectionId)
 
+            // ── 基本信息 ──
             is ConnectionEvent.NameChanged ->
-                updateForm { copy(name = event.value) }
+                updateForm { copy(name = event.value, nameError = null) }
 
-            is ConnectionEvent.ServiceTypeChanged ->
-                updateForm { copy(serviceType = event.value) }
+            is ConnectionEvent.ServiceTypeSelected -> {
+                updateForm {
+                    val newBaseUrl = if (baseUrl.isBlank() || isDefaultBaseUrl(baseUrl)) {
+                        event.value.defaultBaseUrl.orEmpty()
+                    } else {
+                        baseUrl
+                    }
+                    copy(
+                        serviceType = event.value,
+                        baseUrl = newBaseUrl,
+                        baseUrlError = null
+                    )
+                }
+            }
 
             is ConnectionEvent.BaseUrlChanged ->
-                updateForm { copy(baseUrl = event.value) }
+                updateForm {
+                    copy(
+                        baseUrl = event.value,
+                        baseUrlError = validateBaseUrlInstant(event.value),
+                        name = if (name.isBlank()) suggestName(event.value) else name
+                    )
+                }
 
             is ConnectionEvent.DefaultModelChanged ->
                 updateForm { copy(defaultModel = event.value) }
 
+            // ── 结构化 AI 参数 ──
+            is ConnectionEvent.TemperatureChanged ->
+                updateForm { copy(temperature = event.value) }
+
+            is ConnectionEvent.MaxTokensChanged ->
+                updateForm { copy(maxTokens = event.value) }
+
+            is ConnectionEvent.TopPChanged ->
+                updateForm { copy(topP = event.value) }
+
+            is ConnectionEvent.FrequencyPenaltyChanged ->
+                updateForm { copy(frequencyPenalty = event.value) }
+
+            is ConnectionEvent.PresencePenaltyChanged ->
+                updateForm { copy(presencePenalty = event.value) }
+
+            is ConnectionEvent.StreamEnabledChanged ->
+                updateForm { copy(streamEnabled = event.value) }
+
+            // ── 高级配置 ──
             is ConnectionEvent.SystemPromptChanged ->
                 updateForm { copy(systemPrompt = event.value) }
 
-            is ConnectionEvent.ParamsJsonChanged ->
-                updateForm { copy(paramsJson = event.value) }
+            is ConnectionEvent.ParamsJsonOverrideChanged ->
+                updateForm {
+                    copy(
+                        paramsJsonOverride = event.value,
+                        paramsJsonError = validateJsonInstant(event.value, "paramsJson")
+                    )
+                }
 
             is ConnectionEvent.HeadersTemplateJsonChanged ->
-                updateForm { copy(headersTemplateJson = event.value) }
+                updateForm {
+                    copy(
+                        headersTemplateJson = event.value,
+                        headersJsonError = validateJsonAndHeaders(event.value)
+                    )
+                }
 
+            // ── 密钥 ──
             is ConnectionEvent.ApiKeyChanged ->
                 updateForm { copy(apiKey = event.value) }
 
+            // ── 操作 ──
             ConnectionEvent.Save -> saveConnection()
             ConnectionEvent.SetAsDefault -> setAsDefault()
             ConnectionEvent.TestConnection -> testConnection()
@@ -87,6 +145,16 @@ class ConnectionViewModel @Inject constructor(
             ConnectionEvent.ConfirmDelete -> confirmDelete()
             ConnectionEvent.DismissDeleteDialog ->
                 _uiState.update { it.copy(pendingDeleteConnectionId = null) }
+
+            ConnectionEvent.HideForm ->
+                _uiState.update {
+                    it.copy(
+                        isFormVisible = false,
+                        editingConnectionId = null,
+                        form = ConnectionFormState(),
+                        testResult = null
+                    )
+                }
 
             ConnectionEvent.ClearInfo ->
                 _uiState.update { it.copy(infoMessage = null) }
@@ -142,7 +210,8 @@ class ConnectionViewModel @Inject constructor(
                 editingConnectionId = null,
                 form = ConnectionFormState(),
                 testResult = null,
-                errorMessage = null
+                errorMessage = null,
+                isFormVisible = true
             )
         }
     }
@@ -159,7 +228,8 @@ class ConnectionViewModel @Inject constructor(
                 editingConnectionId = connectionId,
                 form = connection.toFormState(),
                 testResult = null,
-                errorMessage = null
+                errorMessage = null,
+                isFormVisible = true
             )
         }
 
@@ -169,7 +239,11 @@ class ConnectionViewModel @Inject constructor(
                     _uiState.update { current ->
                         if (current.editingConnectionId != connectionId) return@update current
                         current.copy(
-                            form = current.form.copy(apiKey = savedKey.orEmpty())
+                            form = current.form.copy(
+                                apiKey = "",
+                                hasExistingApiKey = !savedKey.isNullOrBlank(),
+                                existingApiKeyMask = maskApiKey(savedKey)
+                            )
                         )
                     }
                 }
@@ -216,10 +290,19 @@ class ConnectionViewModel @Inject constructor(
 
             saveResult.fold(
                 onSuccess = { savedConnection ->
-                    val secretResult = saveConnectionSecretUseCase(
-                        connectionId = savedConnection.id,
-                        apiKey = state.form.apiKey
-                    )
+                    // 保存 API Key（仅当用户输入了新 Key 时）
+                    val apiKeyToSave = state.form.apiKey
+                    val shouldSaveKey = apiKeyToSave.isNotBlank() ||
+                        (!state.form.hasExistingApiKey && apiKeyToSave.isBlank())
+
+                    val secretResult = if (shouldSaveKey) {
+                        saveConnectionSecretUseCase(
+                            connectionId = savedConnection.id,
+                            apiKey = apiKeyToSave
+                        )
+                    } else {
+                        Result.success(Unit)
+                    }
 
                     _uiState.update {
                         it.copy(
@@ -230,7 +313,8 @@ class ConnectionViewModel @Inject constructor(
                             } else {
                                 "连接已创建"
                             },
-                            errorMessage = secretResult.exceptionOrNull()?.let(::mapError)
+                            errorMessage = secretResult.exceptionOrNull()?.let(::mapError),
+                            isFormVisible = false
                         )
                     }
                     refreshConnections(keepEditingId = savedConnection.id)
@@ -347,7 +431,8 @@ class ConnectionViewModel @Inject constructor(
                             editingConnectionId = keepEditingId,
                             form = if (wasEditing) ConnectionFormState() else it.form,
                             testResult = if (wasEditing) null else it.testResult,
-                            infoMessage = "连接已删除"
+                            infoMessage = "连接已删除",
+                            isFormVisible = if (wasEditing) false else it.isFormVisible
                         )
                     }
                     refreshConnections(keepEditingId = keepEditingId)
@@ -365,6 +450,8 @@ class ConnectionViewModel @Inject constructor(
         }
     }
 
+    // ── 表单辅助方法 ──
+
     private fun updateForm(transform: ConnectionFormState.() -> ConnectionFormState) {
         _uiState.update { current ->
             current.copy(
@@ -376,21 +463,60 @@ class ConnectionViewModel @Inject constructor(
     }
 
     private fun buildDraft(form: ConnectionFormState): Result<ConnectionDraft> = runCatching {
-        val paramsJson = parseJsonObject(form.paramsJson, "paramsJson").getOrThrow()
+        val paramsJson = buildParamsJson(form)
         val headersTemplateJson = parseJsonObject(
             form.headersTemplateJson,
             "headersTemplateJson"
         ).getOrThrow()
 
+        val config = ConnectionConfig(
+            streamEnabled = form.streamEnabled
+        )
+
         ConnectionDraft(
             name = form.name,
-            serviceType = form.serviceType,
+            serviceType = form.serviceType.serialName,
             baseUrl = form.baseUrl,
             defaultModel = form.defaultModel,
             systemPrompt = form.systemPrompt,
             paramsJson = paramsJson,
-            headersTemplateJson = headersTemplateJson
+            headersTemplateJson = headersTemplateJson,
+            config = config
         )
+    }
+
+    /**
+     * 构建 paramsJson：
+     * - 如果用户填写了原始 JSON 覆盖，以覆盖为准
+     * - 否则从结构化滑块/输入框构建
+     */
+    private fun buildParamsJson(form: ConnectionFormState): JsonObject {
+        val overrideText = form.paramsJsonOverride.trim()
+        if (overrideText.isNotBlank() && overrideText != "{}") {
+            return parseJsonObject(overrideText, "paramsJson").getOrThrow()
+        }
+
+        val map = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
+
+        map["temperature"] = JsonPrimitive(form.temperature.toDouble())
+
+        form.maxTokens.trim().toIntOrNull()?.let {
+            map["max_tokens"] = JsonPrimitive(it)
+        }
+
+        form.topP.trim().toDoubleOrNull()?.let {
+            map["top_p"] = JsonPrimitive(it)
+        }
+
+        if (form.frequencyPenalty != 0.0f) {
+            map["frequency_penalty"] = JsonPrimitive(form.frequencyPenalty.toDouble())
+        }
+
+        if (form.presencePenalty != 0.0f) {
+            map["presence_penalty"] = JsonPrimitive(form.presencePenalty.toDouble())
+        }
+
+        return JsonObject(map)
     }
 
     private fun parseJsonObject(rawValue: String, fieldName: String): Result<JsonObject> = runCatching {
@@ -400,20 +526,109 @@ class ConnectionViewModel @Inject constructor(
             ?: throw IllegalArgumentException("$fieldName 必须是 JSON 对象")
     }
 
-    private fun ApiConnection.toFormState(): ConnectionFormState = ConnectionFormState(
-        name = name,
-        serviceType = serviceType,
-        baseUrl = baseUrl,
-        defaultModel = defaultModel.orEmpty(),
-        systemPrompt = systemPrompt.orEmpty(),
-        paramsJson = paramsJson.toPrettyString(),
-        headersTemplateJson = headersTemplateJson.toPrettyString(),
-        apiKey = ""
-    )
+    // ── 双向转换 ──
+
+    private fun ApiConnection.toFormState(): ConnectionFormState {
+        val config = ConnectionConfig.fromJsonObject(configJson)
+
+        return ConnectionFormState(
+            name = name,
+            serviceType = ServiceType.fromSerialName(serviceType),
+            baseUrl = baseUrl,
+            defaultModel = defaultModel.orEmpty(),
+            systemPrompt = systemPrompt.orEmpty(),
+            temperature = paramsJson.floatParam("temperature") ?: 0.7f,
+            maxTokens = paramsJson.intParam("max_tokens")?.toString().orEmpty(),
+            topP = paramsJson.doubleParam("top_p")?.toString().orEmpty(),
+            frequencyPenalty = paramsJson.floatParam("frequency_penalty") ?: 0.0f,
+            presencePenalty = paramsJson.floatParam("presence_penalty") ?: 0.0f,
+            streamEnabled = config.streamEnabled,
+            paramsJsonOverride = "",
+            headersTemplateJson = headersTemplateJson.toPrettyString(),
+            apiKey = "",
+            hasExistingApiKey = false,
+            existingApiKeyMask = ""
+        )
+    }
 
     private fun JsonObject.toPrettyString(): String {
         if (isEmpty()) return "{}"
         return json.encodeToString(JsonObject.serializer(), this)
+    }
+
+    private fun JsonObject.floatParam(key: String): Float? =
+        this[key]?.jsonPrimitive?.doubleOrNull?.toFloat()
+
+    private fun JsonObject.doubleParam(key: String): Double? =
+        this[key]?.jsonPrimitive?.doubleOrNull
+
+    private fun JsonObject.intParam(key: String): Int? =
+        this[key]?.jsonPrimitive?.intOrNull
+
+    // ── 实时校验 ──
+
+    private fun validateBaseUrlInstant(url: String): String? {
+        if (url.isBlank()) return null // 空值在保存时校验
+        val trimmed = url.trim()
+        val uri = runCatching { URI(trimmed) }.getOrNull() ?: return "URL 格式不合法"
+        val scheme = uri.scheme?.lowercase()
+        if (scheme != "http" && scheme != "https") return "URL 必须以 http:// 或 https:// 开头"
+        if (uri.host.isNullOrBlank()) return "URL 缺少主机名"
+        return null
+    }
+
+    private fun validateJsonInstant(rawValue: String, fieldName: String): String? {
+        val trimmed = rawValue.trim()
+        if (trimmed.isBlank() || trimmed == "{}") return null
+        return parseJsonObject(trimmed, fieldName).exceptionOrNull()?.message
+    }
+
+    private fun validateJsonAndHeaders(rawValue: String): String? {
+        val jsonError = validateJsonInstant(rawValue, "headersTemplateJson")
+        if (jsonError != null) return jsonError
+
+        val trimmed = rawValue.trim()
+        if (trimmed.isBlank() || trimmed == "{}") return null
+
+        val parsed = parseJsonObject(trimmed, "headersTemplateJson").getOrNull() ?: return null
+        val forbiddenHeaders = setOf("authorization", "x-api-key", "api-key")
+        parsed.keys.forEach { key ->
+            val normalized = key.trim().lowercase().replace("_", "-")
+            if (normalized in forbiddenHeaders) {
+                return "禁止包含密钥头「$key」，密钥请使用 API Key 字段"
+            }
+        }
+        return null
+    }
+
+    // ── 辅助工具 ──
+
+    /** 根据 Base URL 域名自动建议连接名称 */
+    private fun suggestName(baseUrl: String): String {
+        if (baseUrl.isBlank()) return ""
+        val host = runCatching { URI(baseUrl.trim()).host }.getOrNull() ?: return ""
+        return when {
+            "openai" in host -> "OpenAI"
+            "anthropic" in host -> "Claude"
+            "googleapis" in host || "google" in host -> "Gemini"
+            "deepseek" in host -> "DeepSeek"
+            "moonshot" in host || "kimi" in host -> "Moonshot"
+            else -> host.removePrefix("api.").removeSuffix(".com").removeSuffix(".ai")
+                .replaceFirstChar { it.uppercase() }
+        }
+    }
+
+    /** 判断当前 baseUrl 是否为某个 ServiceType 的默认 URL */
+    private fun isDefaultBaseUrl(url: String): Boolean {
+        val trimmed = url.trim().trimEnd('/')
+        return ServiceType.entries.any { it.defaultBaseUrl?.trimEnd('/') == trimmed }
+    }
+
+    /** API Key 掩码：显示 sk-...xxxx */
+    private fun maskApiKey(key: String?): String {
+        if (key.isNullOrBlank()) return ""
+        if (key.length <= 8) return "****"
+        return "${key.take(3)}...${key.takeLast(4)}"
     }
 
     private fun mapError(error: Throwable): String {

@@ -31,7 +31,7 @@ class CreateConnectionUseCase @Inject constructor(
             systemPrompt = draft.systemPrompt?.trim()?.takeIf { it.isNotEmpty() },
             paramsJson = draft.paramsJson,
             headersTemplateJson = draft.headersTemplateJson,
-            configJson = draft.configJson,
+            configJson = draft.toConfigJsonObject(),
             createdAt = null,
             updatedAt = null
         )

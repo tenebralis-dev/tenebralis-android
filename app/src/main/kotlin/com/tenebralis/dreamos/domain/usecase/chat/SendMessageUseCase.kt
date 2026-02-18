@@ -1,5 +1,6 @@
 package com.tenebralis.dreamos.domain.usecase.chat
 
+import com.tenebralis.dreamos.domain.model.ConnectionConfig
 import com.tenebralis.dreamos.domain.model.ConversationMessage
 import com.tenebralis.dreamos.domain.model.enums.MessageRole
 import com.tenebralis.dreamos.domain.repository.ApiConnectionRepository
@@ -172,7 +173,42 @@ class SendMessageUseCase @Inject constructor(
             return@flow
         }
 
-        // ── 4. 流式 AI 调用 ──
+        // ── 4. 根据 config_json.stream_enabled 选择流式/非流式 ──
+        val config = ConnectionConfig.fromJsonObject(connection.configJson)
+
+        if (!config.streamEnabled) {
+            // 非流式路径：一次性获取完整回复，仍用 StreamEvent 通知 UI
+            val aiResult = aiChatService.chatCompletion(
+                connection = connection,
+                apiKey = apiKey,
+                messages = contextMessages
+            )
+            if (aiResult.isFailure) {
+                val errorMessage = aiResult.exceptionOrNull()?.message ?: "AI 调用失败"
+                emit(StreamEvent.AiError(errorMessage))
+                return@flow
+            }
+            val response = aiResult.getOrThrow()
+            val assistantContent = response.choices.firstOrNull()?.message?.content?.trim()
+            if (assistantContent.isNullOrEmpty()) {
+                emit(StreamEvent.AiError("AI 返回了空回复"))
+                return@flow
+            }
+            val assistantMessage = sendAssistantMessage(
+                userId = userId,
+                conversationId = normalizedConversationId,
+                content = assistantContent
+            )
+            updateConversationLastMessageUseCase(
+                conversationId = normalizedConversationId,
+                lastMessageAt = Instant.now().toString(),
+                summary = buildSummary(assistantContent)
+            ).getOrThrow()
+            emit(StreamEvent.AiCompleted(assistantMessage))
+            return@flow
+        }
+
+        // 流式路径
         val accumulated = StringBuilder()
         var hasError = false
 
