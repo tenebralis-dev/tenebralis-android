@@ -5,6 +5,8 @@ sealed interface ChatDetailEvent {
     data class InputChanged(val value: String) : ChatDetailEvent
     data object Send : ChatDetailEvent
     data object RetrySend : ChatDetailEvent
+    data object RetryAiCall : ChatDetailEvent
     data object ClearError : ChatDetailEvent
+    data object ClearAiError : ChatDetailEvent
     data object ClearInfo : ChatDetailEvent
 }

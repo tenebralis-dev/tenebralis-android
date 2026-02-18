@@ -73,7 +73,7 @@ class DreamEntryViewModel @Inject constructor(
                     is DreamEntryDestination.ConversationSelection ->
                         state.copy(
                             isResolving = false,
-                            navigateRoute = Screen.ChatList.createRoute(destination.saveId)
+                            navigateRoute = Screen.Dream.createRoute(destination.saveId)
                         )
 
                     is DreamEntryDestination.Error ->

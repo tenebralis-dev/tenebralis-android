@@ -28,6 +28,20 @@ class NpcRepositoryImpl @Inject constructor(
         )
     }.catch { emit(Result.failure(it)) }
 
+    override suspend fun getById(npcId: String): Result<Npc> = runCatching {
+        val userId = requireCurrentUserId()
+        require(npcId.isNotBlank()) { "npcId 不能为空" }
+        supabase.from(TABLE_NPCS)
+            .select {
+                filter {
+                    eq("id", npcId)
+                    eq("user_id", userId)
+                }
+            }
+            .decodeSingle<NpcDto>()
+            .toDomain()
+    }
+
     override suspend fun create(npc: Npc): Result<Npc> = runCatching {
         val userId = requireCurrentUserId()
         validateForWrite(npc = npc, expectedUserId = userId)

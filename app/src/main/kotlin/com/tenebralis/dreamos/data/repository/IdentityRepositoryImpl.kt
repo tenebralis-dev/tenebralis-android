@@ -32,6 +32,20 @@ class IdentityRepositoryImpl @Inject constructor(
         )
     }.catch { emit(Result.failure(it)) }
 
+    override suspend fun getById(identityId: String): Result<UserWorldIdentity> = runCatching {
+        val userId = requireCurrentUserId()
+        require(identityId.isNotBlank()) { "identityId 不能为空" }
+        supabase.from(TABLE_IDENTITIES)
+            .select {
+                filter {
+                    eq("id", identityId)
+                    eq("user_id", userId)
+                }
+            }
+            .decodeSingle<UserWorldIdentityDto>()
+            .toDomain()
+    }
+
     override suspend fun create(identity: UserWorldIdentity): Result<UserWorldIdentity> = runCatching {
         val userId = requireCurrentUserId()
         validateForWrite(identity = identity, expectedUserId = userId)

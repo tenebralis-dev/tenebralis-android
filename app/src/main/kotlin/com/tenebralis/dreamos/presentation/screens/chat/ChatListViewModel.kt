@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenebralis.dreamos.domain.model.Conversation
 import com.tenebralis.dreamos.domain.model.Npc
+import com.tenebralis.dreamos.domain.repository.AuthRepository
+import com.tenebralis.dreamos.domain.repository.NpcRepository
 import com.tenebralis.dreamos.domain.usecase.chat.GetConversationsBySaveUseCase
 import com.tenebralis.dreamos.domain.usecase.chat.GetNpcsUseCase
 import com.tenebralis.dreamos.domain.usecase.chat.GetOrCreateConversationUseCase
@@ -23,7 +25,9 @@ class ChatListViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getConversationsBySaveUseCase: GetConversationsBySaveUseCase,
     private val getOrCreateConversationUseCase: GetOrCreateConversationUseCase,
-    private val getNpcsUseCase: GetNpcsUseCase
+    private val getNpcsUseCase: GetNpcsUseCase,
+    private val npcRepository: NpcRepository,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     private val saveId: String? = savedStateHandle.get<String>(Screen.ChatList.ARG_SAVE_ID)
@@ -50,6 +54,15 @@ class ChatListViewModel @Inject constructor(
 
             ChatListEvent.ClearInfo ->
                 _uiState.update { it.copy(infoMessage = null) }
+
+            ChatListEvent.ShowCreateNpcDialog ->
+                _uiState.update { it.copy(showCreateNpcDialog = true) }
+
+            ChatListEvent.DismissCreateNpcDialog ->
+                _uiState.update { it.copy(showCreateNpcDialog = false) }
+
+            is ChatListEvent.ConfirmCreateNpc ->
+                createNpc(event.name, event.description)
         }
     }
 
@@ -142,6 +155,56 @@ class ChatListViewModel @Inject constructor(
             return
         }
         _uiState.update { it.copy(navigateToConversationId = normalizedConversationId) }
+    }
+
+    private fun createNpc(name: String, description: String) {
+        val trimmedName = name.trim()
+        if (trimmedName.isEmpty()) {
+            _uiState.update { it.copy(errorMessage = "NPC 名称不能为空") }
+            return
+        }
+        val userId = authRepository.getCurrentUserId()
+        if (userId == null) {
+            _uiState.update { it.copy(errorMessage = "当前未登录") }
+            return
+        }
+        if (_uiState.value.isCreatingNpc) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isCreatingNpc = true, errorMessage = null) }
+
+            val newNpc = Npc(
+                id = java.util.UUID.randomUUID().toString(),
+                userId = userId,
+                name = trimmedName,
+                description = description.trim().takeIf { it.isNotEmpty() },
+                promptNpcText = null,
+                personaJson = kotlinx.serialization.json.JsonObject(emptyMap()),
+                createdAt = null,
+                updatedAt = null
+            )
+
+            npcRepository.create(newNpc).fold(
+                onSuccess = {
+                    _uiState.update {
+                        it.copy(
+                            isCreatingNpc = false,
+                            showCreateNpcDialog = false,
+                            infoMessage = "NPC「${trimmedName}」创建成功"
+                        )
+                    }
+                    refresh()
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            isCreatingNpc = false,
+                            errorMessage = UseCaseErrorMapper.toMessage(error)
+                        )
+                    }
+                }
+            )
+        }
     }
 }
 

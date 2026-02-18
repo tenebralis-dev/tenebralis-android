@@ -7,6 +7,8 @@ data class ChatListUiState(
     val saveId: String? = null,
     val isLoading: Boolean = false,
     val isCreatingConversation: Boolean = false,
+    val isCreatingNpc: Boolean = false,
+    val showCreateNpcDialog: Boolean = false,
     val selectedNpcId: String? = null,
     val conversations: List<Conversation> = emptyList(),
     val npcs: List<Npc> = emptyList(),

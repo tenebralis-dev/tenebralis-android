@@ -13,6 +13,9 @@ interface NpcRepository {
     /** 获取当前用户的所有 NPC */
     fun getByUser(): Flow<Result<List<Npc>>>
 
+    /** 根据 ID 获取 NPC 详情 */
+    suspend fun getById(npcId: String): Result<Npc>
+
     /** 创建新 NPC */
     suspend fun create(npc: Npc): Result<Npc>
 

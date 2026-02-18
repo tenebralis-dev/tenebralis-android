@@ -13,6 +13,9 @@ interface SaveStateRepository {
     /** 获取指定身份下的所有存档 */
     fun getByIdentity(identityId: String): Flow<Result<List<WorldSaveState>>>
 
+    /** 根据 ID 获取存档详情 */
+    suspend fun getById(saveId: String): Result<WorldSaveState>
+
     /** 创建新存档 */
     suspend fun create(saveState: WorldSaveState): Result<WorldSaveState>
 

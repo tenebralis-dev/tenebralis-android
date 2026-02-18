@@ -1,4 +1,6 @@
-package com.tenebralis.dreamos.presentation.screens.chat
+package com.tenebralis.dreamos.presentation.screens.dream
+
+import android.util.Log
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -8,6 +10,7 @@ import com.tenebralis.dreamos.domain.usecase.chat.NoApiKeyException
 import com.tenebralis.dreamos.domain.usecase.chat.NoConnectionException
 import com.tenebralis.dreamos.domain.usecase.chat.SendMessageUseCase
 import com.tenebralis.dreamos.domain.usecase.common.UseCaseErrorMapper
+import com.tenebralis.dreamos.domain.usecase.dream.EnterDreamUseCase
 import com.tenebralis.dreamos.presentation.navigation.Screen
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -18,60 +21,68 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 @HiltViewModel
-class ChatDetailViewModel @Inject constructor(
+class DreamViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
+    private val enterDreamUseCase: EnterDreamUseCase,
     private val getMessagesUseCase: GetMessagesUseCase,
     private val sendMessageUseCase: SendMessageUseCase
 ) : ViewModel() {
 
-    private val conversationId: String =
-        checkNotNull(savedStateHandle[Screen.ChatDetail.ARG_CONVERSATION_ID])
+    private val saveId: String =
+        checkNotNull(savedStateHandle[Screen.Dream.ARG_SAVE_ID])
 
-    private val _uiState = MutableStateFlow(
-        ChatDetailUiState(conversationId = conversationId)
-    )
-    val uiState: StateFlow<ChatDetailUiState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(DreamUiState())
+    val uiState: StateFlow<DreamUiState> = _uiState.asStateFlow()
+
+    /** 已初始化的 conversationId，由 EnterDream 设置 */
+    private var conversationId: String? = null
 
     init {
-        refresh()
+        initializeDream()
     }
 
-    fun onEvent(event: ChatDetailEvent) {
+    fun onEvent(event: DreamEvent) {
         when (event) {
-            ChatDetailEvent.Refresh -> refresh()
-            is ChatDetailEvent.InputChanged ->
-                _uiState.update { it.copy(inputText = event.value, errorMessage = null) }
-
-            ChatDetailEvent.Send -> sendMessage(_uiState.value.inputText.trim())
-            ChatDetailEvent.RetrySend -> retrySend()
-            ChatDetailEvent.RetryAiCall -> retryAiCall()
-            ChatDetailEvent.ClearError ->
-                _uiState.update { it.copy(errorMessage = null) }
-
-            ChatDetailEvent.ClearAiError ->
+            DreamEvent.Refresh -> refreshMessages()
+            DreamEvent.Send -> sendMessage(_uiState.value.inputText.trim())
+            DreamEvent.RetrySend -> retrySend()
+            DreamEvent.RetryAiCall -> retryAiCall()
+            DreamEvent.ClearAiError ->
                 _uiState.update { it.copy(aiErrorMessage = null) }
-
-            ChatDetailEvent.ClearInfo ->
+            DreamEvent.ClearError ->
+                _uiState.update { it.copy(errorMessage = null) }
+            DreamEvent.ClearInfo ->
                 _uiState.update { it.copy(infoMessage = null) }
+            is DreamEvent.InputChanged ->
+                _uiState.update { it.copy(inputText = event.text, errorMessage = null) }
+            DreamEvent.ToggleContext ->
+                _uiState.update { it.copy(isContextExpanded = !it.isContextExpanded) }
         }
     }
 
-    private fun refresh() {
+    // ─── 初始化 ─────────────────────────────────────────────
+
+    private fun initializeDream() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            getMessagesUseCase(conversationId).fold(
-                onSuccess = { messages ->
+            _uiState.update { it.copy(isInitializing = true, errorMessage = null) }
+
+            enterDreamUseCase(saveId).fold(
+                onSuccess = { session ->
+                    Log.d(TAG, "EnterDream success: world=${session.world.name}, npc=${session.narratorNpc.name}, conv=${session.conversation.id}")
+                    conversationId = session.conversation.id
                     _uiState.update {
                         it.copy(
-                            isLoading = false,
-                            messages = messages.sortedBy { message -> message.seq }
+                            isInitializing = false,
+                            session = session
                         )
                     }
+                    refreshMessages()
                 },
                 onFailure = { error ->
+                    Log.e(TAG, "EnterDream failed for saveId=$saveId", error)
                     _uiState.update {
                         it.copy(
-                            isLoading = false,
+                            isInitializing = false,
                             errorMessage = UseCaseErrorMapper.toMessage(error)
                         )
                     }
@@ -79,6 +90,28 @@ class ChatDetailViewModel @Inject constructor(
             )
         }
     }
+
+    // ─── 消息刷新 ───────────────────────────────────────────
+
+    private fun refreshMessages() {
+        val cid = conversationId ?: return
+        viewModelScope.launch {
+            getMessagesUseCase(cid).fold(
+                onSuccess = { messages ->
+                    _uiState.update {
+                        it.copy(messages = messages.sortedBy { m -> m.seq })
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(errorMessage = UseCaseErrorMapper.toMessage(error))
+                    }
+                }
+            )
+        }
+    }
+
+    // ─── 发送消息 ───────────────────────────────────────────
 
     private fun retrySend() {
         val content = _uiState.value.failedContent
@@ -90,7 +123,6 @@ class ChatDetailViewModel @Inject constructor(
     }
 
     private fun retryAiCall() {
-        // AI 失败时，user 消息已落库，重新发送最后一条 user 消息内容
         val lastUserContent = _uiState.value.messages
             .lastOrNull { it.role == com.tenebralis.dreamos.domain.model.enums.MessageRole.USER }
             ?.content
@@ -99,15 +131,19 @@ class ChatDetailViewModel @Inject constructor(
             _uiState.update { it.copy(aiErrorMessage = "没有可重试的消息") }
             return
         }
-        // 清除 AI 错误后重新发送（会产生新的 user 消息 + AI 调用）
         _uiState.update { it.copy(aiErrorMessage = null) }
         sendMessage(lastUserContent)
     }
 
     private fun sendMessage(content: String) {
+        val cid = conversationId
+        if (cid == null) {
+            _uiState.update { it.copy(errorMessage = "梦境尚未初始化") }
+            return
+        }
         val normalizedContent = content.trim()
         if (normalizedContent.isEmpty()) {
-            _uiState.update { it.copy(errorMessage = "请输入消息内容") }
+            _uiState.update { it.copy(errorMessage = "请输入你的行动") }
             return
         }
         if (_uiState.value.isSending || _uiState.value.isAiResponding) return
@@ -124,7 +160,7 @@ class ChatDetailViewModel @Inject constructor(
             }
 
             sendMessageUseCase(
-                conversationId = conversationId,
+                conversationId = cid,
                 content = normalizedContent
             ).fold(
                 onSuccess = { result ->
@@ -135,10 +171,10 @@ class ChatDetailViewModel @Inject constructor(
                             inputText = "",
                             failedContent = null,
                             aiErrorMessage = result.aiError,
-                            infoMessage = if (result.aiError == null) null else "消息已发送，但 AI 回复失败"
+                            infoMessage = if (result.aiError == null) null else "消息已发送，但叙事者回复失败"
                         )
                     }
-                    refresh()
+                    refreshMessages()
                 },
                 onFailure = { error ->
                     val errorMsg = when (error) {
@@ -157,5 +193,9 @@ class ChatDetailViewModel @Inject constructor(
                 }
             )
         }
+    }
+
+    companion object {
+        private const val TAG = "DreamViewModel"
     }
 }

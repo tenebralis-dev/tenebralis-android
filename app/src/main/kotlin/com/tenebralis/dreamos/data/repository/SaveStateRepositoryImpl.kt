@@ -34,6 +34,20 @@ class SaveStateRepositoryImpl @Inject constructor(
         )
     }.catch { emit(Result.failure(it)) }
 
+    override suspend fun getById(saveId: String): Result<WorldSaveState> = runCatching {
+        val userId = requireCurrentUserId()
+        require(saveId.isNotBlank()) { "saveId 不能为空" }
+        supabase.from(TABLE_SAVE_STATES)
+            .select {
+                filter {
+                    eq("id", saveId)
+                    eq("user_id", userId)
+                }
+            }
+            .decodeSingle<WorldSaveStateDto>()
+            .toDomain()
+    }
+
     override suspend fun create(saveState: WorldSaveState): Result<WorldSaveState> = runCatching {
         val userId = requireCurrentUserId()
         validateForWrite(saveState = saveState, expectedUserId = userId)

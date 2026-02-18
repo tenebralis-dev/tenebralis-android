@@ -23,6 +23,7 @@ import com.tenebralis.dreamos.presentation.screens.chat.ChatDetailScreen
 import com.tenebralis.dreamos.presentation.screens.chat.ChatListScreen
 import com.tenebralis.dreamos.presentation.screens.connection.ConnectionScreen
 import com.tenebralis.dreamos.presentation.screens.dreamentry.DreamEntryScreen
+import com.tenebralis.dreamos.presentation.screens.dream.DreamScreen
 import com.tenebralis.dreamos.presentation.screens.identity.IdentityScreen
 import com.tenebralis.dreamos.presentation.screens.save.SaveSelectScreen
 import com.tenebralis.dreamos.presentation.screens.settings.SettingsScreen
@@ -72,6 +73,19 @@ fun DreamOsNavGraph(
                         launchSingleTop = true
                     }
                 }
+            )
+        }
+
+        composable(
+            route = Screen.Dream.route,
+            arguments = listOf(
+                navArgument(Screen.Dream.ARG_SAVE_ID) {
+                    type = NavType.StringType
+                }
+            )
+        ) {
+            DreamScreen(
+                onBackClick = { navController.popBackStack() }
             )
         }
 

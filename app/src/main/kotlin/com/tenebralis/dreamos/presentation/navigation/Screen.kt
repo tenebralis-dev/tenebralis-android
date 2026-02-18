@@ -15,8 +15,19 @@ sealed class Screen(val route: String) {
     /** DreamOS 主界面（B3 实现） */
     data object Home : Screen("home")
 
-    /** 梦境入口（自动续梦） */
+    /** 梦境入口（自动续梦 → 世界选择） */
     data object DreamEntry : Screen("dream_entry")
+
+    /** 梦境 TRPG 叙事 */
+    data object Dream : Screen("dream/{saveId}") {
+        const val ARG_SAVE_ID = "saveId"
+
+        fun createRoute(saveId: String): String {
+            val normalizedSaveId = saveId.trim()
+            require(normalizedSaveId.isNotEmpty()) { "saveId 不能为空" }
+            return "dream/${Uri.encode(normalizedSaveId)}"
+        }
+    }
 
     /** 世界入口（B4 实现） */
     data object World : Screen("world")

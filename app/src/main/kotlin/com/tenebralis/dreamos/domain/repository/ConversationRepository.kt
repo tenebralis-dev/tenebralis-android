@@ -13,6 +13,9 @@ interface ConversationRepository {
     /** 获取指定存档下的所有会话（按 lastMessageAt 降序） */
     fun getBySave(saveId: String): Flow<Result<List<Conversation>>>
 
+    /** 根据 ID 获取会话详情 */
+    suspend fun getById(conversationId: String): Result<Conversation>
+
     /**
      * 获取或创建会话线程
      *

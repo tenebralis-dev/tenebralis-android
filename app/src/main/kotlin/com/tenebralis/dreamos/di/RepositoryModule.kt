@@ -4,6 +4,7 @@ import com.tenebralis.dreamos.data.repository.AuthRepositoryImpl
 import com.tenebralis.dreamos.data.repository.ApiConnectionRepositoryImpl
 import com.tenebralis.dreamos.data.repository.ConnectionSecretRepositoryImpl
 import com.tenebralis.dreamos.data.repository.ConversationRepositoryImpl
+import com.tenebralis.dreamos.data.repository.GlobalMemoryRepositoryImpl
 import com.tenebralis.dreamos.data.repository.IdentityRepositoryImpl
 import com.tenebralis.dreamos.data.repository.MessageRepositoryImpl
 import com.tenebralis.dreamos.data.repository.NpcRepositoryImpl
@@ -15,6 +16,7 @@ import com.tenebralis.dreamos.domain.repository.ApiConnectionRepository
 import com.tenebralis.dreamos.domain.repository.AuthRepository
 import com.tenebralis.dreamos.domain.repository.ConnectionSecretRepository
 import com.tenebralis.dreamos.domain.repository.ConversationRepository
+import com.tenebralis.dreamos.domain.repository.GlobalMemoryRepository
 import com.tenebralis.dreamos.domain.repository.IdentityRepository
 import com.tenebralis.dreamos.domain.repository.MessageRepository
 import com.tenebralis.dreamos.domain.repository.NpcRepository
@@ -94,8 +96,9 @@ abstract class RepositoryModule {
         impl: NpcRepositoryImpl
     ): NpcRepository
 
-    // 后续 Phase 的 Repository 在此追加绑定：
-    // abstract fun bindApiConnectionRepository(impl: ApiConnectionRepositoryImpl): ApiConnectionRepository
-    // abstract fun bindGlobalMemoryRepository(impl: GlobalMemoryRepositoryImpl): GlobalMemoryRepository
-    // abstract fun bindUserSettingsRepository(impl: UserSettingsRepositoryImpl): UserSettingsRepository
+    @Binds
+    @Singleton
+    abstract fun bindGlobalMemoryRepository(
+        impl: GlobalMemoryRepositoryImpl
+    ): GlobalMemoryRepository
 }

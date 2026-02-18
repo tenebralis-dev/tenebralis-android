@@ -13,6 +13,9 @@ interface IdentityRepository {
     /** 获取指定世界下的所有身份 */
     fun getByWorld(worldId: String): Flow<Result<List<UserWorldIdentity>>>
 
+    /** 根据 ID 获取身份详情 */
+    suspend fun getById(identityId: String): Result<UserWorldIdentity>
+
     /** 创建新身份 */
     suspend fun create(identity: UserWorldIdentity): Result<UserWorldIdentity>
 

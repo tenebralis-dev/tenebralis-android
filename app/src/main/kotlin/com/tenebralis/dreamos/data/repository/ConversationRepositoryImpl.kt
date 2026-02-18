@@ -31,6 +31,21 @@ class ConversationRepositoryImpl @Inject constructor(
         )
     }.catch { emit(Result.failure(it)) }
 
+    override suspend fun getById(conversationId: String): Result<Conversation> = runCatching {
+        val userId = requireCurrentUserId()
+        val normalizedId = conversationId.trim()
+        require(normalizedId.isNotEmpty()) { "conversationId 不能为空" }
+        supabase.from(TABLE_CONVERSATIONS)
+            .select {
+                filter {
+                    eq("id", normalizedId)
+                    eq("user_id", userId)
+                }
+            }
+            .decodeSingle<ConversationDto>()
+            .toDomain()
+    }
+
     override suspend fun getOrCreate(
         saveId: String,
         npcId: String,
