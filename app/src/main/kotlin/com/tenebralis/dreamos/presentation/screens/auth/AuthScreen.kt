@@ -1,11 +1,15 @@
 package com.tenebralis.dreamos.presentation.screens.auth
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -30,11 +35,11 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -53,6 +58,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -61,6 +67,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
@@ -85,7 +92,8 @@ fun AuthScreen(
                 Snackbar(
                     snackbarData = data,
                     containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    shape = RoundedCornerShape(12.dp)
                 )
             }
         }
@@ -93,6 +101,14 @@ fun AuthScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                            MaterialTheme.colorScheme.background
+                        )
+                    )
+                )
                 .padding(innerPadding)
                 .imePadding()
         ) {
@@ -140,7 +156,7 @@ private fun LoginRegisterContent(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -149,13 +165,14 @@ private fun LoginRegisterContent(
             text = "界影浮光",
             style = MaterialTheme.typography.displayLarge,
             color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Light
+            fontWeight = FontWeight.Bold
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = "Dream OS",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            letterSpacing = 2.sp
         )
         Spacer(modifier = Modifier.height(48.dp))
 
@@ -163,22 +180,65 @@ private fun LoginRegisterContent(
             modifier = Modifier
                 .widthIn(max = 480.dp)
                 .fillMaxWidth(),
+            shape = RoundedCornerShape(32.dp),
             colors = CardDefaults.elevatedCardColors(
                 containerColor = MaterialTheme.colorScheme.surface
+            ),
+            elevation = CardDefaults.elevatedCardElevation(
+                defaultElevation = 8.dp
             )
         ) {
             Column(
                 modifier = Modifier
-                    .padding(24.dp)
+                    .padding(32.dp)
                     .fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = if (uiState.isLogin) "欢迎回来" else "创建账号",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(24.dp))
+                // 动画切换标题
+                AnimatedContent(
+                    targetState = uiState.isLogin,
+                    transitionSpec = {
+                        (slideInHorizontally { if (targetState) -it else it } + fadeIn())
+                            .togetherWith(slideOutHorizontally { if (targetState) it else -it } + fadeOut())
+                    },
+                    label = "TitleTransition"
+                ) { isLogin ->
+                    Text(
+                        text = if (isLogin) "欢迎回来" else "创建账号",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // ── 用户名输入（仅注册，带动画） ──
+                AnimatedVisibility(
+                    visible = !uiState.isLogin,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Column {
+                        OutlinedTextField(
+                            value = uiState.username,
+                            onValueChange = { onEvent(AuthEvent.UsernameChanged(it)) },
+                            label = { Text("用户名") },
+                            leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Text,
+                                imeAction = ImeAction.Next
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !uiState.isLoading,
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                }
 
                 // ── 邮箱输入 ──
                 OutlinedTextField(
@@ -195,9 +255,10 @@ private fun LoginRegisterContent(
                         onNext = { focusManager.moveFocus(FocusDirection.Down) }
                     ),
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = !uiState.isLoading
+                    enabled = !uiState.isLoading,
+                    shape = RoundedCornerShape(16.dp)
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // ── 密码输入 ──
                 OutlinedTextField(
@@ -219,90 +280,100 @@ private fun LoginRegisterContent(
                         VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Password,
-                        imeAction = if (uiState.isLogin) ImeAction.Done else ImeAction.Next
+                        imeAction = ImeAction.Done
                     ),
                     keyboardActions = KeyboardActions(
-                        onNext = { focusManager.moveFocus(FocusDirection.Down) },
-                        onDone = { onEvent(AuthEvent.Submit) }
+                        onDone = {
+                            focusManager.clearFocus()
+                            onEvent(AuthEvent.Submit)
+                        }
                     ),
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = !uiState.isLoading
+                    enabled = !uiState.isLoading,
+                    shape = RoundedCornerShape(16.dp)
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                if (uiState.isLogin) {
-                    // ── 记住我（仅登录） ──
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Checkbox(
-                            checked = uiState.rememberMe,
-                            onCheckedChange = { checked ->
-                                onEvent(AuthEvent.RememberMeChanged(checked))
-                            },
-                            enabled = !uiState.isLoading
-                        )
-                        Text(
-                            text = "记住我",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                // ── 记住我（仅登录，带动画） ──
+                AnimatedVisibility(
+                    visible = uiState.isLogin,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = uiState.rememberMe,
+                                onCheckedChange = { checked ->
+                                    onEvent(AuthEvent.RememberMeChanged(checked))
+                                },
+                                enabled = !uiState.isLoading
+                            )
+                            Text(
+                                text = "记住我",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
-                    Spacer(modifier = Modifier.height(24.dp))
-                } else {
-                    // ── 用户名输入（仅注册） ──
-                    OutlinedTextField(
-                        value = uiState.username,
-                        onValueChange = { onEvent(AuthEvent.UsernameChanged(it)) },
-                        label = { Text("用户名") },
-                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Text,
-                            imeAction = ImeAction.Done
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onDone = { onEvent(AuthEvent.Submit) }
-                        ),
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !uiState.isLoading
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
+                }
+                if (!uiState.isLogin) {
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
                 // ── 提交按钮 ──
-                FilledTonalButton(
-                    onClick = { onEvent(AuthEvent.Submit) },
+                Button(
+                    onClick = {
+                        focusManager.clearFocus()
+                        onEvent(AuthEvent.Submit)
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp),
+                        .height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
                     enabled = !uiState.isLoading
                 ) {
-                    if (uiState.isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
+                    AnimatedContent(
+                        targetState = uiState.isLoading,
+                        label = "ButtonLoadingTransition"
+                    ) { isLoading ->
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text(
+                                text = if (uiState.isLogin) "登录" else "注册",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
-                    Text(
-                        text = if (uiState.isLogin) "登录" else "注册",
-                        style = MaterialTheme.typography.labelLarge
-                    )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 // ── 模式切换 ──
                 TextButton(
                     onClick = { onEvent(AuthEvent.ToggleAuthMode) },
                     enabled = !uiState.isLoading
                 ) {
-                    Text(
-                        text = if (uiState.isLogin) "还没有账号？去注册" else "已有账号？去登录",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    AnimatedContent(
+                        targetState = uiState.isLogin,
+                        label = "ToggleModeTextTransition"
+                    ) { isLogin ->
+                        Text(
+                            text = if (isLogin) "还没有账号？去注册" else "已有账号？去登录",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
         }
@@ -318,11 +389,13 @@ private fun OtpVerificationContent(
     uiState: AuthUiState,
     onEvent: (AuthEvent) -> Unit
 ) {
+    val focusManager = LocalFocusManager.current
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -330,13 +403,17 @@ private fun OtpVerificationContent(
             modifier = Modifier
                 .widthIn(max = 480.dp)
                 .fillMaxWidth(),
+            shape = RoundedCornerShape(32.dp),
             colors = CardDefaults.elevatedCardColors(
                 containerColor = MaterialTheme.colorScheme.surface
+            ),
+            elevation = CardDefaults.elevatedCardElevation(
+                defaultElevation = 8.dp
             )
         ) {
             Column(
                 modifier = Modifier
-                    .padding(24.dp)
+                    .padding(32.dp)
                     .fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -351,28 +428,29 @@ private fun OtpVerificationContent(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回"
+                            contentDescription = "返回",
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // ── 标题与提示 ──
                 Text(
                     text = "验证邮箱",
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.SemiBold
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = "验证码已发送至\n${uiState.email}",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
                 )
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(40.dp))
 
                 // ── 验证码输入 ──
                 OutlinedTextField(
@@ -390,51 +468,71 @@ private fun OtpVerificationContent(
                         imeAction = ImeAction.Done
                     ),
                     keyboardActions = KeyboardActions(
-                        onDone = { onEvent(AuthEvent.VerifyOtp) }
+                        onDone = {
+                            focusManager.clearFocus()
+                            onEvent(AuthEvent.VerifyOtp)
+                        }
                     ),
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !uiState.isLoading,
+                    shape = RoundedCornerShape(16.dp),
                     textStyle = MaterialTheme.typography.headlineSmall.copy(
                         textAlign = TextAlign.Center,
                         letterSpacing = MaterialTheme.typography.headlineSmall.letterSpacing * 2
                     )
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(32.dp))
 
                 // ── 验证按钮 ──
-                FilledTonalButton(
-                    onClick = { onEvent(AuthEvent.VerifyOtp) },
+                Button(
+                    onClick = {
+                        focusManager.clearFocus()
+                        onEvent(AuthEvent.VerifyOtp)
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp),
+                        .height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
                     enabled = !uiState.isLoading && uiState.otpCode.length == 6
                 ) {
-                    if (uiState.isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
+                    AnimatedContent(
+                        targetState = uiState.isLoading,
+                        label = "VerifyButtonLoadingTransition"
+                    ) { isLoading ->
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text(
+                                text = "验证",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
-                    Text(
-                        text = "验证",
-                        style = MaterialTheme.typography.labelLarge
-                    )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 // ── 重新发送 ──
                 OutlinedButton(
                     onClick = { onEvent(AuthEvent.ResendOtp) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(16.dp),
                     enabled = !uiState.isLoading && uiState.resendCooldownSeconds == 0
                 ) {
                     Text(
                         text = if (uiState.resendCooldownSeconds > 0)
                             "重新发送 (${uiState.resendCooldownSeconds}s)"
                         else
-                            "重新发送验证码"
+                            "重新发送验证码",
+                        style = MaterialTheme.typography.labelLarge
                     )
                 }
             }
