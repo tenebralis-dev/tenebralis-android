@@ -43,7 +43,8 @@ prd/
 /.cursor/
 
 # IntelliJ / Android Studio
-/.idea/.vscode/
+/.idea
+/.vscode
 
 # Fonts
 fonts/
