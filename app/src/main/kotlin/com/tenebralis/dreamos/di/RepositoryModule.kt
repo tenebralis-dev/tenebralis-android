@@ -3,6 +3,7 @@ package com.tenebralis.dreamos.di
 import com.tenebralis.dreamos.data.repository.AchievementRepositoryImpl
 import com.tenebralis.dreamos.data.repository.AuthRepositoryImpl
 import com.tenebralis.dreamos.data.repository.CurrencyRepositoryImpl
+import com.tenebralis.dreamos.data.repository.FontRepositoryImpl
 import com.tenebralis.dreamos.data.repository.ApiConnectionRepositoryImpl
 import com.tenebralis.dreamos.data.repository.ConnectionSecretRepositoryImpl
 import com.tenebralis.dreamos.data.repository.ConversationRepositoryImpl
@@ -23,6 +24,7 @@ import com.tenebralis.dreamos.domain.repository.AchievementRepository
 import com.tenebralis.dreamos.domain.repository.ApiConnectionRepository
 import com.tenebralis.dreamos.domain.repository.AuthRepository
 import com.tenebralis.dreamos.domain.repository.CurrencyRepository
+import com.tenebralis.dreamos.domain.repository.FontRepository
 import com.tenebralis.dreamos.domain.repository.ConnectionSecretRepository
 import com.tenebralis.dreamos.domain.repository.ConversationRepository
 import com.tenebralis.dreamos.domain.repository.ForumRepository
@@ -177,4 +179,12 @@ abstract class RepositoryModule {
     abstract fun bindShopRepository(
         impl: ShopRepositoryImpl
     ): ShopRepository
+
+    // ─── 自定义字体 ────────────────────────────────────────
+
+    @Binds
+    @Singleton
+    abstract fun bindFontRepository(
+        impl: FontRepositoryImpl
+    ): FontRepository
 }

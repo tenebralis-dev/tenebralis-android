@@ -11,22 +11,27 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.tenebralis.dreamos.data.repository.FontManager
 import com.tenebralis.dreamos.domain.model.SessionState
 import com.tenebralis.dreamos.presentation.components.DreamOsSplashScreen
 import com.tenebralis.dreamos.presentation.navigation.DreamOsNavGraph
 import com.tenebralis.dreamos.presentation.theme.DreamOsTheme
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val mainViewModel: MainViewModel by viewModels()
 
+    @Inject
+    lateinit var fontManager: FontManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            DreamOsTheme {
+            DreamOsTheme(fontManager = fontManager) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

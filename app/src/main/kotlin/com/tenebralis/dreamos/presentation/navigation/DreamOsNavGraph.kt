@@ -295,6 +295,25 @@ fun DreamOsNavGraph(
             )
         }
 
+        // ─── 自定义（壁纸/图标/配色/字体）────────────────────────
+        composable(Screen.Customize.route) {
+            com.tenebralis.dreamos.presentation.screens.customize.CustomizeScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToFont = {
+                    navController.navigate(Screen.FontPicker.route) {
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
+        // ─── 字体选择（自定义模块）────────────────────────────────
+        composable(Screen.FontPicker.route) {
+            com.tenebralis.dreamos.presentation.screens.font.FontPickerScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
         // ─── 通用功能占位 ────────────────────────────────────
         composable(
             route = Screen.FeaturePlaceholder.route,

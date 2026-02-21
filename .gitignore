@@ -1,11 +1,8 @@
 # IDE
 *.iml
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
+/.idea/
+/.vscode/
+/.cursor/
 
 # Gradle / 构建
 .gradle
@@ -39,12 +36,11 @@ docs/
 icon/
 prd/
 
-# Cursor
-/.cursor/
-
-# IntelliJ / Android Studio
-/.idea
-/.vscode
-
 # Fonts
 fonts/
+
+# Assets (示例字体等)
+assets/
+
+# Wrangler
+.wrangler/

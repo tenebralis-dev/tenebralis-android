@@ -136,6 +136,12 @@ sealed class Screen(val route: String) {
     /** 商店页面（M7.5 实现） */
     data object Shop : Screen("shop")
 
+    /** 字体选择页面（自定义模块） */
+    data object FontPicker : Screen("font_picker")
+
+    /** 自定义页面（壁纸/图标/配色/字体） */
+    data object Customize : Screen("customize")
+
     /**
      * 通用功能占位路由
      *
