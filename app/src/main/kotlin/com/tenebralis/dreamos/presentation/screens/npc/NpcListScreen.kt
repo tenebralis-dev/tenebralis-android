@@ -45,18 +45,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.AsyncImage
 import com.tenebralis.dreamos.domain.model.Npc
+import com.tenebralis.dreamos.domain.model.avatarUrl
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun NpcListScreen(
     onBackClick: () -> Unit,
+    onNavigateToEdit: (String) -> Unit,
     viewModel: NpcListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -166,6 +171,9 @@ fun NpcListScreen(
                     ) { npc ->
                         NpcItemCard(
                             npc = npc,
+                            resolvedAvatarUrl = npc.avatarUrl
+                                ?: uiState.avatarSignedUrls[npc.id],
+                            onClick = { onNavigateToEdit(npc.id) },
                             onLongClick = { viewModel.showDeleteDialog(npc) }
                         )
                     }
@@ -294,13 +302,15 @@ fun NpcListScreen(
 @Composable
 private fun NpcItemCard(
     npc: Npc,
+    resolvedAvatarUrl: String?,
+    onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClick = { /* 暂不做详情页 */ },
+                onClick = onClick,
                 onLongClick = onLongClick
             ),
         colors = CardDefaults.cardColors(
@@ -314,20 +324,31 @@ private fun NpcItemCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // 头像占位
+            // 头像
             Surface(
                 modifier = Modifier.size(44.dp),
                 shape = MaterialTheme.shapes.medium,
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Person,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .padding(8.dp)
-                        .size(28.dp)
-                )
+                if (resolvedAvatarUrl != null) {
+                    AsyncImage(
+                        model = resolvedAvatarUrl,
+                        contentDescription = npc.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(MaterialTheme.shapes.medium)
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Filled.Person,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .size(28.dp)
+                    )
+                }
             }
 
             Column(

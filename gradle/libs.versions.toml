@@ -28,6 +28,7 @@ kotlinxCoroutines = "1.8.1"
 
 # ── 图片 ──
 coil = "3.3.0"
+imageCropper = "4.7.0"
 
 # ── 测试 ──
 junit = "4.13.2"
@@ -89,6 +90,7 @@ androidx-security-crypto = { group = "androidx.security", name = "security-crypt
 # ── Coil ──
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
 coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
+android-image-cropper = { group = "com.vanniktech", name = "android-image-cropper", version.ref = "imageCropper" }
 
 # ── Test ──
 junit = { group = "junit", name = "junit", version.ref = "junit" }

@@ -110,6 +110,9 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
 
+    // ── Image Cropper ──
+    implementation(libs.android.image.cropper)
+
     // ── Test ──
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

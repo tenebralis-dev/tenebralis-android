@@ -5,6 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenebralis.dreamos.domain.model.CharacterCardData
 import com.tenebralis.dreamos.domain.model.Npc
+import com.tenebralis.dreamos.domain.model.avatarPath
+import com.tenebralis.dreamos.domain.model.avatarUrl
+import com.tenebralis.dreamos.domain.repository.AvatarStorageRepository
 import com.tenebralis.dreamos.domain.usecase.chat.GetNpcsUseCase
 import com.tenebralis.dreamos.domain.usecase.common.UseCaseErrorMapper
 import com.tenebralis.dreamos.domain.usecase.npc.CreateNpcUseCase
@@ -40,6 +43,9 @@ data class NpcListUiState(
     val conflictCardData: CharacterCardData? = null,
     val conflictPngBytes: ByteArray? = null,
 
+    // 头像签名 URL 缓存（npcId → signedUrl）
+    val avatarSignedUrls: Map<String, String> = emptyMap(),
+
     // 消息
     val errorMessage: String? = null,
     val infoMessage: String? = null
@@ -52,7 +58,8 @@ class NpcListViewModel @Inject constructor(
     private val getNpcsUseCase: GetNpcsUseCase,
     private val createNpcUseCase: CreateNpcUseCase,
     private val deleteNpcUseCase: DeleteNpcUseCase,
-    private val importCharacterCardUseCase: ImportCharacterCardUseCase
+    private val importCharacterCardUseCase: ImportCharacterCardUseCase,
+    private val avatarStorageRepository: AvatarStorageRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(NpcListUiState())
@@ -68,6 +75,7 @@ class NpcListViewModel @Inject constructor(
             getNpcsUseCase().fold(
                 onSuccess = { npcs ->
                     _uiState.update { it.copy(isLoading = false, npcs = npcs) }
+                    resolveAvatarUrls(npcs)
                 },
                 onFailure = { error ->
                     _uiState.update {
@@ -78,6 +86,28 @@ class NpcListViewModel @Inject constructor(
                     }
                 }
             )
+        }
+    }
+
+    /**
+     * 为有 avatar_path 但无 avatar_url 的 NPC 批量生成签名 URL
+     */
+    private fun resolveAvatarUrls(npcs: List<Npc>) {
+        val needResolve = npcs.filter { it.avatarUrl == null && it.avatarPath != null }
+        if (needResolve.isEmpty()) return
+
+        viewModelScope.launch {
+            val resolved = mutableMapOf<String, String>()
+            for (npc in needResolve) {
+                val path = npc.avatarPath ?: continue
+                avatarStorageRepository.createSignedUrl(path).fold(
+                    onSuccess = { url -> resolved[npc.id] = url },
+                    onFailure = { /* 静默忽略，显示兜底占位图 */ }
+                )
+            }
+            if (resolved.isNotEmpty()) {
+                _uiState.update { it.copy(avatarSignedUrls = it.avatarSignedUrls + resolved) }
+            }
         }
     }
 

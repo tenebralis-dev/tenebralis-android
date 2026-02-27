@@ -317,6 +317,25 @@ fun DreamOsNavGraph(
         // ─── NPC 管理（角色卡）────────────────────────────────
         composable(Screen.NpcList.route) {
             com.tenebralis.dreamos.presentation.screens.npc.NpcListScreen(
+                onBackClick = { navController.popBackStack() },
+                onNavigateToEdit = { npcId ->
+                    navController.navigate(Screen.NpcEdit.createRoute(npcId)) {
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
+        // ─── NPC 编辑详情 ─────────────────────────────────────
+        composable(
+            route = Screen.NpcEdit.route,
+            arguments = listOf(
+                navArgument(Screen.NpcEdit.ARG_NPC_ID) {
+                    type = NavType.StringType
+                }
+            )
+        ) {
+            com.tenebralis.dreamos.presentation.screens.npc.NpcEditScreen(
                 onBackClick = { navController.popBackStack() }
             )
         }

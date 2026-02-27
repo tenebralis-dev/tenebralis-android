@@ -142,6 +142,12 @@ sealed class Screen(val route: String) {
     /** NPC 管理（角色卡） */
     data object NpcList : Screen("npc_list")
 
+    /** NPC 编辑详情 */
+    data object NpcEdit : Screen("npc_edit/{npcId}") {
+        const val ARG_NPC_ID = "npcId"
+        fun createRoute(npcId: String) = "npc_edit/${Uri.encode(npcId)}"
+    }
+
     /** 预设管理（兼容 SillyTavern 预设） */
     data object Preset : Screen("preset")
 

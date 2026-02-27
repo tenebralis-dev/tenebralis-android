@@ -15,6 +15,7 @@ data class PersonaJsonData(
     @SerialName("source_format_version") val sourceFormatVersion: String? = null,
     @SerialName("avatar_file") val avatarFile: String? = null,
     @SerialName("avatar_url") val avatarUrl: String? = null,
+    @SerialName("avatar_path") val avatarPath: String? = null,
     @SerialName("first_message") val firstMessage: String? = null,
     @SerialName("alternate_greetings") val alternateGreetings: List<String> = emptyList(),
     val personality: String? = null,

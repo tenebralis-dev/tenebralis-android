@@ -128,10 +128,17 @@ class ImportCharacterCardUseCase @Inject constructor(
         val promptText = promptParts.joinToString("\n\n")
 
         // 构建 persona_json
+        val avatarRaw = card.avatar.takeIf { it.isNotBlank() }
+        val isUrl = avatarRaw?.let {
+            it.startsWith("http://", ignoreCase = true) ||
+                it.startsWith("https://", ignoreCase = true)
+        } ?: false
+
         val persona = PersonaJsonData(
             source = "sillytavern",
             sourceFormatVersion = "v2",
-            avatarFile = card.avatar.takeIf { it.isNotBlank() },
+            avatarFile = avatarRaw,
+            avatarUrl = if (isUrl) avatarRaw else null,
             firstMessage = card.messages.firstOrNull(),
             alternateGreetings = card.messages.drop(1),
             personality = card.other["personality"],

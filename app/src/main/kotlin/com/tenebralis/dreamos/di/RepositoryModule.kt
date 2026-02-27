@@ -1,6 +1,7 @@
 package com.tenebralis.dreamos.di
 
 import com.tenebralis.dreamos.data.repository.AchievementRepositoryImpl
+import com.tenebralis.dreamos.data.repository.AvatarStorageRepositoryImpl
 import com.tenebralis.dreamos.data.repository.AuthRepositoryImpl
 import com.tenebralis.dreamos.data.repository.CurrencyRepositoryImpl
 import com.tenebralis.dreamos.data.repository.FontRepositoryImpl
@@ -21,6 +22,7 @@ import com.tenebralis.dreamos.data.repository.UserRepositoryImpl
 import com.tenebralis.dreamos.data.repository.WorldNpcPersonaRepositoryImpl
 import com.tenebralis.dreamos.data.repository.WorldRepositoryImpl
 import com.tenebralis.dreamos.domain.repository.AchievementRepository
+import com.tenebralis.dreamos.domain.repository.AvatarStorageRepository
 import com.tenebralis.dreamos.domain.repository.ApiConnectionRepository
 import com.tenebralis.dreamos.domain.repository.AuthRepository
 import com.tenebralis.dreamos.domain.repository.CurrencyRepository
@@ -187,4 +189,20 @@ abstract class RepositoryModule {
     abstract fun bindFontRepository(
         impl: FontRepositoryImpl
     ): FontRepository
+
+    // ─── Storage ──────────────────────────────────────────
+
+    @Binds
+    @Singleton
+    abstract fun bindAvatarStorageRepository(
+        impl: AvatarStorageRepositoryImpl
+    ): AvatarStorageRepository
+
+    // ─── AI Preset ────────────────────────────────────────
+
+    @Binds
+    @Singleton
+    abstract fun bindAiPresetRepository(
+        impl: com.tenebralis.dreamos.data.repository.AiPresetRepositoryImpl
+    ): com.tenebralis.dreamos.domain.repository.AiPresetRepository
 }
