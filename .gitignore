@@ -37,10 +37,10 @@ icon/
 prd/
 
 # Fonts
-fonts/
+/fonts/
 
 # Assets (示例字体等文件)
-assets/
+/assets/
 
 # Wrangler
 .wrangler/
