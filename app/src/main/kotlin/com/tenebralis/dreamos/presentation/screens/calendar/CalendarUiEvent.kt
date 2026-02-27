@@ -26,7 +26,7 @@ sealed interface CalendarUiEvent {
     data class StartTimeChanged(val value: String) : CalendarUiEvent
     data class EndTimeChanged(val value: String) : CalendarUiEvent
     data class AllDayChanged(val value: Boolean) : CalendarUiEvent
-    data class RepeatRuleChanged(val value: String) : CalendarUiEvent
+    data class RruleChanged(val value: String) : CalendarUiEvent
     data class AiVisibilityChanged(val value: AiVisibility) : CalendarUiEvent
 
     // 操作

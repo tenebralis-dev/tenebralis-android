@@ -70,6 +70,34 @@ class NpcRepositoryImpl @Inject constructor(
             .toDomain()
     }
 
+    override suspend fun getByName(name: String): Result<Npc?> = runCatching {
+        val userId = requireCurrentUserId()
+        val trimmedName = name.trim()
+        require(trimmedName.isNotEmpty()) { "name 不能为空" }
+        supabase.from(TABLE_NPCS)
+            .select {
+                filter {
+                    eq("user_id", userId)
+                    eq("name", trimmedName)
+                }
+            }
+            .decodeList<NpcDto>()
+            .firstOrNull()
+            ?.toDomain()
+    }
+
+    override suspend fun delete(npcId: String): Result<Unit> = runCatching {
+        val userId = requireCurrentUserId()
+        require(npcId.isNotBlank()) { "npcId 不能为空" }
+        supabase.from(TABLE_NPCS)
+            .delete {
+                filter {
+                    eq("id", npcId)
+                    eq("user_id", userId)
+                }
+            }
+    }
+
     private suspend fun fetchByUser(userId: String): List<NpcDto> {
         return supabase.from(TABLE_NPCS)
             .select {

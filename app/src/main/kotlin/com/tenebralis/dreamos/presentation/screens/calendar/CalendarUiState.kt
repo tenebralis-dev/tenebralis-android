@@ -26,8 +26,8 @@ data class CalendarUiState(
     val editDate: String = "",         // yyyy-MM-dd
     val editStartTime: String = "09:00",
     val editEndTime: String = "10:00",
-    val editIsAllDay: Boolean = false,
-    val editRepeatRule: String = "none",
+    val editAllDay: Boolean = false,
+    val editRrule: String = "none",
     val editAiVisibility: com.tenebralis.dreamos.domain.model.enums.AiVisibility =
         com.tenebralis.dreamos.domain.model.enums.AiVisibility.PRIVATE
 ) {

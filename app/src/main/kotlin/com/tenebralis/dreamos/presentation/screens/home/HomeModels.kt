@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
@@ -40,7 +41,7 @@ fun dreamOsHomePages(): List<List<HomeAppItem>> {
     return listOf(
         listOf(
             HomeAppItem("好感", Icons.Filled.Favorite, Screen.Affinity.createRoute()),
-            HomeAppItem("身份", Icons.Filled.Person, Screen.World.route),
+            HomeAppItem("身份", Icons.Filled.Person, Screen.NpcList.route),
             HomeAppItem("任务", Icons.Filled.Assignment, Screen.Task.route),
             HomeAppItem("论坛", Icons.Filled.Forum, Screen.Forum.route),
             HomeAppItem("商店", Icons.Filled.Storefront, Screen.Shop.route),
@@ -55,6 +56,7 @@ fun dreamOsHomePages(): List<List<HomeAppItem>> {
             HomeAppItem("音乐", Icons.Filled.MusicNote, Screen.FeaturePlaceholder.createRoute("音乐"))
         ),
         listOf(
+            HomeAppItem("预设", Icons.Filled.Layers, Screen.Preset.route),
             HomeAppItem("自定义", Icons.Filled.Tune, Screen.Customize.route),
             HomeAppItem("连接", Icons.Filled.Link, Screen.Connection.route),
             HomeAppItem("记忆", Icons.Filled.Bookmark, Screen.Memory.route),

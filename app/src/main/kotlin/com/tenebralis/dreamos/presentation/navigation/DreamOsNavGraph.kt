@@ -314,6 +314,18 @@ fun DreamOsNavGraph(
             )
         }
 
+        // ─── NPC 管理（角色卡）────────────────────────────────
+        composable(Screen.NpcList.route) {
+            com.tenebralis.dreamos.presentation.screens.npc.NpcListScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        // ─── 预设管理（兼容 SillyTavern 预设）───────────────────────
+        composable(Screen.Preset.route) {
+            FeaturePlaceholderScreen(title = "预设")
+        }
+
         // ─── 通用功能占位 ────────────────────────────────────
         composable(
             route = Screen.FeaturePlaceholder.route,

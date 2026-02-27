@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenebralis.dreamos.domain.model.UserCalendarEvent
 import com.tenebralis.dreamos.domain.model.enums.AiVisibility
+import com.tenebralis.dreamos.domain.model.enums.ScopeType
 import com.tenebralis.dreamos.domain.repository.AuthRepository
 import com.tenebralis.dreamos.domain.repository.CalendarRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -51,8 +52,8 @@ class CalendarViewModel @Inject constructor(
                         editDate = selectedDate.toString(),
                         editStartTime = "09:00",
                         editEndTime = "10:00",
-                        editIsAllDay = false,
-                        editRepeatRule = "none",
+                        editAllDay = false,
+                        editRrule = "none",
                         editAiVisibility = AiVisibility.PRIVATE
                     )
                 }
@@ -71,8 +72,8 @@ class CalendarViewModel @Inject constructor(
                         editDate = dateStr,
                         editStartTime = startTime,
                         editEndTime = endTime,
-                        editIsAllDay = e.isAllDay,
-                        editRepeatRule = e.repeatRule ?: "none",
+                        editAllDay = e.allDay,
+                        editRrule = e.rrule ?: "none",
                         editAiVisibility = e.aiVisibility
                     )
                 }
@@ -92,9 +93,9 @@ class CalendarViewModel @Inject constructor(
             is CalendarUiEvent.EndTimeChanged ->
                 _uiState.update { it.copy(editEndTime = event.value) }
             is CalendarUiEvent.AllDayChanged ->
-                _uiState.update { it.copy(editIsAllDay = event.value) }
-            is CalendarUiEvent.RepeatRuleChanged ->
-                _uiState.update { it.copy(editRepeatRule = event.value) }
+                _uiState.update { it.copy(editAllDay = event.value) }
+            is CalendarUiEvent.RruleChanged ->
+                _uiState.update { it.copy(editRrule = event.value) }
             is CalendarUiEvent.AiVisibilityChanged ->
                 _uiState.update { it.copy(editAiVisibility = event.value) }
 
@@ -141,12 +142,12 @@ class CalendarViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, errorMessage = null) }
 
-            val startAt = if (state.editIsAllDay) {
+            val startAt = if (state.editAllDay) {
                 "${state.editDate}T00:00:00"
             } else {
                 "${state.editDate}T${state.editStartTime}:00"
             }
-            val endAt = if (state.editIsAllDay) {
+            val endAt = if (state.editAllDay) {
                 null
             } else {
                 "${state.editDate}T${state.editEndTime}:00"
@@ -165,8 +166,11 @@ class CalendarViewModel @Inject constructor(
                     description = state.editDescription.trim().ifEmpty { null },
                     startAt = startAt,
                     endAt = endAt,
-                    isAllDay = state.editIsAllDay,
-                    repeatRule = state.editRepeatRule.takeIf { it != "none" },
+                    allDay = state.editAllDay,
+                    rrule = state.editRrule.takeIf { it != "none" },
+                    scopeType = ScopeType.GLOBAL,
+                    worldId = null,
+                    saveId = null,
                     aiVisibility = state.editAiVisibility
                 )
                 calendarRepository.create(newEvent)
@@ -180,8 +184,8 @@ class CalendarViewModel @Inject constructor(
                     description = state.editDescription.trim().ifEmpty { null },
                     startAt = startAt,
                     endAt = endAt,
-                    isAllDay = state.editIsAllDay,
-                    repeatRule = state.editRepeatRule.takeIf { it != "none" },
+                    allDay = state.editAllDay,
+                    rrule = state.editRrule.takeIf { it != "none" },
                     aiVisibility = state.editAiVisibility
                 )
                 calendarRepository.update(updated)

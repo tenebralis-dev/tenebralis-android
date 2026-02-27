@@ -30,7 +30,8 @@ interface CalendarRepository {
     suspend fun getForContext(
         visibleSet: Set<AiVisibility>,
         scopeType: ScopeType? = null,
-        scopeId: String? = null,
+        worldId: String? = null,
+        saveId: String? = null,
         limit: Int = 5
     ): Result<List<UserCalendarEvent>>
 }

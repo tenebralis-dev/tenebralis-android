@@ -215,8 +215,8 @@ fun CalendarScreen(
                 date = uiState.editDate,
                 startTime = uiState.editStartTime,
                 endTime = uiState.editEndTime,
-                isAllDay = uiState.editIsAllDay,
-                repeatRule = uiState.editRepeatRule,
+                allDay = uiState.editAllDay,
+                rrule = uiState.editRrule,
                 aiVisibility = uiState.editAiVisibility,
                 isSaving = uiState.isSaving,
                 onTitleChanged = { viewModel.onEvent(CalendarUiEvent.TitleChanged(it)) },
@@ -225,7 +225,7 @@ fun CalendarScreen(
                 onStartTimeChanged = { viewModel.onEvent(CalendarUiEvent.StartTimeChanged(it)) },
                 onEndTimeChanged = { viewModel.onEvent(CalendarUiEvent.EndTimeChanged(it)) },
                 onAllDayChanged = { viewModel.onEvent(CalendarUiEvent.AllDayChanged(it)) },
-                onRepeatRuleChanged = { viewModel.onEvent(CalendarUiEvent.RepeatRuleChanged(it)) },
+                onRruleChanged = { viewModel.onEvent(CalendarUiEvent.RruleChanged(it)) },
                 onAiVisibilityChanged = { viewModel.onEvent(CalendarUiEvent.AiVisibilityChanged(it)) },
                 onSave = { viewModel.onEvent(CalendarUiEvent.SaveEvent) },
                 onDismiss = { viewModel.onEvent(CalendarUiEvent.DismissEdit) }
@@ -391,7 +391,7 @@ private fun EventCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                val timeText = if (event.isAllDay) {
+                val timeText = if (event.allDay) {
                     "全天"
                 } else {
                     val start = if (event.startAt.length >= 16) event.startAt.substring(11, 16) else ""
@@ -405,7 +405,7 @@ private fun EventCard(
                 )
                 // 重复规则 + AI可见性
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    event.repeatRule?.let { rule ->
+                    event.rrule?.let { rule ->
                         val ruleLabel = when (rule) {
                             "daily" -> "🔄 每天"
                             "weekly" -> "🔄 每周"
@@ -451,8 +451,8 @@ private fun CalendarEditSheet(
     date: String,
     startTime: String,
     endTime: String,
-    isAllDay: Boolean,
-    repeatRule: String,
+    allDay: Boolean,
+    rrule: String,
     aiVisibility: AiVisibility,
     isSaving: Boolean,
     onTitleChanged: (String) -> Unit,
@@ -461,7 +461,7 @@ private fun CalendarEditSheet(
     onStartTimeChanged: (String) -> Unit,
     onEndTimeChanged: (String) -> Unit,
     onAllDayChanged: (Boolean) -> Unit,
-    onRepeatRuleChanged: (String) -> Unit,
+    onRruleChanged: (String) -> Unit,
     onAiVisibilityChanged: (AiVisibility) -> Unit,
     onSave: () -> Unit,
     onDismiss: () -> Unit
@@ -523,7 +523,7 @@ private fun CalendarEditSheet(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Checkbox(
-                    checked = isAllDay,
+                    checked = allDay,
                     onCheckedChange = onAllDayChanged,
                     enabled = !isSaving
                 )
@@ -531,7 +531,7 @@ private fun CalendarEditSheet(
             }
 
             // 时间（非全天时显示）
-            if (!isAllDay) {
+            if (!allDay) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -557,9 +557,9 @@ private fun CalendarEditSheet(
             }
 
             // 重复规则下拉
-            RepeatRuleDropdown(
-                selected = repeatRule,
-                onChanged = onRepeatRuleChanged,
+            RruleDropdown(
+                selected = rrule,
+                onChanged = onRruleChanged,
                 enabled = !isSaving
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -600,7 +600,7 @@ private fun CalendarEditSheet(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun RepeatRuleDropdown(
+private fun RruleDropdown(
     selected: String,
     onChanged: (String) -> Unit,
     enabled: Boolean

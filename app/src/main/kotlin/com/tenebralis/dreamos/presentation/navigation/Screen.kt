@@ -139,6 +139,12 @@ sealed class Screen(val route: String) {
     /** 字体选择页面（自定义模块） */
     data object FontPicker : Screen("font_picker")
 
+    /** NPC 管理（角色卡） */
+    data object NpcList : Screen("npc_list")
+
+    /** 预设管理（兼容 SillyTavern 预设） */
+    data object Preset : Screen("preset")
+
     /** 自定义页面（壁纸/图标/配色/字体） */
     data object Customize : Screen("customize")
 

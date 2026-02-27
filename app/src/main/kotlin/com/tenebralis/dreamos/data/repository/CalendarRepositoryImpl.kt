@@ -1,7 +1,8 @@
 package com.tenebralis.dreamos.data.repository
 
 import com.tenebralis.dreamos.data.mapper.toDomain
-import com.tenebralis.dreamos.data.mapper.toDto
+import com.tenebralis.dreamos.data.mapper.toInsertDto
+import com.tenebralis.dreamos.data.mapper.toUpdateDto
 import com.tenebralis.dreamos.data.remote.dto.UserCalendarDto
 import com.tenebralis.dreamos.domain.model.UserCalendarEvent
 import com.tenebralis.dreamos.domain.model.enums.AiVisibility
@@ -36,6 +37,7 @@ class CalendarRepositoryImpl @Inject constructor(
                             eq("user_id", userId)
                             gte("start_at", startOfMonth)
                             lte("start_at", endOfMonth)
+                            exact("deleted_at", null)
                         }
                     }
                     .decodeList<UserCalendarDto>()
@@ -50,7 +52,7 @@ class CalendarRepositoryImpl @Inject constructor(
         require(event.userId == userId) { "event.userId 与当前会话不一致" }
 
         supabase.from(TABLE)
-            .insert(event.toDto()) {
+            .insert(event.toInsertDto()) {
                 select()
             }
             .decodeSingle<UserCalendarDto>()
@@ -62,7 +64,7 @@ class CalendarRepositoryImpl @Inject constructor(
         require(event.userId == userId) { "event.userId 与当前会话不一致" }
 
         supabase.from(TABLE)
-            .update(event.toDto()) {
+            .update(event.toUpdateDto()) {
                 filter {
                     eq("id", event.id)
                     eq("user_id", userId)
@@ -78,7 +80,7 @@ class CalendarRepositoryImpl @Inject constructor(
         require(eventId.isNotBlank()) { "eventId 不能为空" }
 
         supabase.from(TABLE)
-            .delete {
+            .update(mapOf("deleted_at" to java.time.Instant.now().toString())) {
                 filter {
                     eq("id", eventId)
                     eq("user_id", userId)
@@ -89,7 +91,8 @@ class CalendarRepositoryImpl @Inject constructor(
     override suspend fun getForContext(
         visibleSet: Set<AiVisibility>,
         scopeType: ScopeType?,
-        scopeId: String?,
+        worldId: String?,
+        saveId: String?,
         limit: Int
     ): Result<List<UserCalendarEvent>> = runCatching {
         val userId = requireCurrentUserId()
@@ -105,17 +108,20 @@ class CalendarRepositoryImpl @Inject constructor(
                     isIn("ai_visibility", visibleSet.map { it.name.lowercase() })
                     gte("start_at", startRange)
                     lte("start_at", endRange)
+                    exact("deleted_at", null)
+                    if (scopeType != null) {
+                        eq("scope_type", scopeType.name.lowercase())
+                    }
+                    if (worldId != null) {
+                        eq("world_id", worldId)
+                    }
+                    if (saveId != null) {
+                        eq("save_id", saveId)
+                    }
                 }
             }
             .decodeList<UserCalendarDto>()
             .map { it.toDomain() }
-            .let { events ->
-                if (scopeType != null) {
-                    events.filter { it.scopeType == scopeType && (scopeId == null || it.scopeId == scopeId) }
-                } else {
-                    events
-                }
-            }
             .sortedBy { it.startAt }
             .take(limit)
     }

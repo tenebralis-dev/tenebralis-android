@@ -21,6 +21,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.contentLength
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow

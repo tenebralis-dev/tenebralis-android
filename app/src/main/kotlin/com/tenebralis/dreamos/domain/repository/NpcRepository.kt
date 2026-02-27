@@ -21,4 +21,10 @@ interface NpcRepository {
 
     /** 更新 NPC */
     suspend fun update(npc: Npc): Result<Npc>
+
+    /** 按名称查找 NPC（用于同名冲突检测） */
+    suspend fun getByName(name: String): Result<Npc?>
+
+    /** 删除 NPC */
+    suspend fun delete(npcId: String): Result<Unit>
 }
