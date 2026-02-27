@@ -446,12 +446,6 @@ private fun ConnectionFormContent(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // ── 🤖 AI 参数 ──
-        FormSectionHeader(title = "🤖 AI 参数")
-        AiParamsSection(state = state, onEvent = onEvent)
-
-        Spacer(modifier = Modifier.height(4.dp))
-
         // ── ⚙️ 高级配置（默认收起）──
         CollapsibleSection(title = "⚙️ 高级配置", defaultExpanded = false) {
             AdvancedConfigSection(state = state, onEvent = onEvent)
@@ -562,106 +556,74 @@ private fun BasicInfoSection(
         )
     )
 
-    // Default Model
-    OutlinedTextField(
-        value = form.defaultModel,
-        onValueChange = { onEvent(ConnectionEvent.DefaultModelChanged(it)) },
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text("Default Model (可选)") },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
-    )
-}
-
-// ── AI 参数分组 ──
-
-@Composable
-private fun AiParamsSection(
-    state: ConnectionUiState,
-    onEvent: (ConnectionEvent) -> Unit
-) {
-    val form = state.form
-
-    // Temperature
-    LabeledSlider(
-        label = "Temperature",
-        value = form.temperature,
-        onValueChange = { onEvent(ConnectionEvent.TemperatureChanged(it)) },
-        valueRange = 0f..2f,
-        steps = 19,
-        displayFormat = { "%.1f".format(it) }
-    )
-
-    // Max Tokens
-    OutlinedTextField(
-        value = form.maxTokens,
-        onValueChange = { onEvent(ConnectionEvent.MaxTokensChanged(it)) },
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text("Max Tokens (可选)") },
-        placeholder = { Text("留空则由模型决定") },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Next
-        )
-    )
-
-    // Top P
-    OutlinedTextField(
-        value = form.topP,
-        onValueChange = { onEvent(ConnectionEvent.TopPChanged(it)) },
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text("Top P (可选, 0.0 ~ 1.0)") },
-        placeholder = { Text("留空则由模型决定") },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Decimal,
-            imeAction = ImeAction.Next
-        )
-    )
-
-    // Frequency Penalty
-    LabeledSlider(
-        label = "Frequency Penalty",
-        value = form.frequencyPenalty,
-        onValueChange = { onEvent(ConnectionEvent.FrequencyPenaltyChanged(it)) },
-        valueRange = -2f..2f,
-        steps = 39,
-        displayFormat = { "%.1f".format(it) }
-    )
-
-    // Presence Penalty
-    LabeledSlider(
-        label = "Presence Penalty",
-        value = form.presencePenalty,
-        onValueChange = { onEvent(ConnectionEvent.PresencePenaltyChanged(it)) },
-        valueRange = -2f..2f,
-        steps = 39,
-        displayFormat = { "%.1f".format(it) }
-    )
-
-    // Stream 开关
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "流式回复",
-                style = MaterialTheme.typography.bodyLarge
-            )
-            Text(
-                text = "开启后 AI 回复将逐字显示（打字机效果）",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+    // Default Model（可编辑下拉 + 拉取按钮）
+    var modelDropdownExpanded by remember { mutableStateOf(false) }
+    val filteredModels = remember(form.defaultModel, form.availableModels) {
+        if (form.defaultModel.isBlank()) {
+            form.availableModels
+        } else {
+            form.availableModels.filter {
+                it.contains(form.defaultModel, ignoreCase = true)
+            }
         }
-        Switch(
-            checked = form.streamEnabled,
-            onCheckedChange = { onEvent(ConnectionEvent.StreamEnabledChanged(it)) }
+    }
+
+    ExposedDropdownMenuBox(
+        expanded = modelDropdownExpanded && filteredModels.isNotEmpty(),
+        onExpandedChange = {
+            modelDropdownExpanded = it
+        }
+    ) {
+        OutlinedTextField(
+            value = form.defaultModel,
+            onValueChange = {
+                onEvent(ConnectionEvent.DefaultModelChanged(it))
+                modelDropdownExpanded = true
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(MenuAnchorType.PrimaryEditable),
+            label = { Text("Default Model (可选)") },
+            singleLine = true,
+            trailingIcon = {
+                if (form.availableModels.isNotEmpty()) {
+                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = modelDropdownExpanded)
+                }
+            },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
         )
+        if (filteredModels.isNotEmpty()) {
+            ExposedDropdownMenu(
+                expanded = modelDropdownExpanded,
+                onDismissRequest = { modelDropdownExpanded = false }
+            ) {
+                filteredModels.forEach { modelId ->
+                    DropdownMenuItem(
+                        text = { Text(modelId, style = MaterialTheme.typography.bodyMedium) },
+                        onClick = {
+                            onEvent(ConnectionEvent.DefaultModelChanged(modelId))
+                            modelDropdownExpanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    // 拉取模型按钮
+    OutlinedButton(
+        onClick = { onEvent(ConnectionEvent.FetchModels) },
+        enabled = !form.isFetchingModels && form.baseUrl.isNotBlank(),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        if (form.isFetchingModels) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        Text(if (form.availableModels.isEmpty()) "拉取模型列表" else "刷新模型列表 (${form.availableModels.size})")
     }
 }
 
@@ -674,17 +636,6 @@ private fun AdvancedConfigSection(
 ) {
     val form = state.form
 
-    // System Prompt
-    OutlinedTextField(
-        value = form.systemPrompt,
-        onValueChange = { onEvent(ConnectionEvent.SystemPromptChanged(it)) },
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text("System Prompt (可选)") },
-        placeholder = { Text("作为每次对话的前置系统指令") },
-        minLines = 3,
-        maxLines = 6
-    )
-
     // Headers Template JSON
     OutlinedTextField(
         value = form.headersTemplateJson,
@@ -693,19 +644,6 @@ private fun AdvancedConfigSection(
         label = { Text("Headers 模板 (JSON)") },
         isError = form.headersJsonError != null,
         supportingText = form.headersJsonError?.let { { Text(it) } },
-        minLines = 2,
-        maxLines = 6
-    )
-
-    // Params JSON 原始覆盖
-    OutlinedTextField(
-        value = form.paramsJsonOverride,
-        onValueChange = { onEvent(ConnectionEvent.ParamsJsonOverrideChanged(it)) },
-        modifier = Modifier.fillMaxWidth(),
-        label = { Text("Params JSON 覆盖 (可选)") },
-        placeholder = { Text("填写后将覆盖上方滑块设置的参数") },
-        isError = form.paramsJsonError != null,
-        supportingText = form.paramsJsonError?.let { { Text(it) } },
         minLines = 2,
         maxLines = 6
     )
@@ -875,45 +813,6 @@ private fun CollapsibleSection(
                 content()
             }
         }
-    }
-}
-
-@Composable
-private fun LabeledSlider(
-    label: String,
-    value: Float,
-    onValueChange: (Float) -> Unit,
-    valueRange: ClosedFloatingPointRange<Float>,
-    steps: Int,
-    displayFormat: (Float) -> String
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium
-            )
-            Text(
-                text = displayFormat(value),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-        Slider(
-            value = value,
-            onValueChange = { newValue ->
-                // 四舍五入到一位小数
-                val rounded = (newValue * 10).roundToInt() / 10f
-                onValueChange(rounded)
-            },
-            valueRange = valueRange,
-            steps = steps
-        )
     }
 }
 

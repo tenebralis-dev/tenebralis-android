@@ -18,10 +18,7 @@ class UpdateConnectionUseCase @Inject constructor(
             serviceType = draft.serviceType.trim(),
             baseUrl = normalizeBaseUrl(draft.baseUrl),
             defaultModel = draft.defaultModel?.trim()?.takeIf { it.isNotEmpty() },
-            systemPrompt = draft.systemPrompt?.trim()?.takeIf { it.isNotEmpty() },
-            paramsJson = draft.paramsJson,
-            headersTemplateJson = draft.headersTemplateJson,
-            configJson = draft.toConfigJsonObject()
+            headersTemplateJson = draft.headersTemplateJson
         )
 
         validator.validate(updated).getOrThrow()

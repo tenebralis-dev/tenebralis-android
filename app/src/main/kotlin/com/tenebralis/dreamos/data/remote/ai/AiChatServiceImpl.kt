@@ -45,7 +45,8 @@ class AiChatServiceImpl @Inject constructor(
     override suspend fun chatCompletion(
         connection: ApiConnection,
         apiKey: String,
-        messages: List<ChatMessage>
+        messages: List<ChatMessage>,
+        samplingParams: JsonObject
     ): Result<ChatCompletionResponse> = runCatching {
         require(connection.baseUrl.isNotBlank()) { "Base URL 不能为空" }
         require(apiKey.isNotBlank()) { "API Key 不能为空" }
@@ -53,7 +54,7 @@ class AiChatServiceImpl @Inject constructor(
 
         val model = connection.defaultModel?.takeIf { it.isNotBlank() }
             ?: DEFAULT_MODEL
-        val request = buildRequest(model, messages, connection.paramsJson, stream = false)
+        val request = buildRequest(model, messages, samplingParams, stream = false)
         val endpoint = "${connection.baseUrl.trimEnd('/')}/chat/completions"
 
         try {
@@ -103,7 +104,8 @@ class AiChatServiceImpl @Inject constructor(
     override fun chatCompletionStream(
         connection: ApiConnection,
         apiKey: String,
-        messages: List<ChatMessage>
+        messages: List<ChatMessage>,
+        samplingParams: JsonObject
     ): Flow<Result<String>> = flow {
         require(connection.baseUrl.isNotBlank()) { "Base URL 不能为空" }
         require(apiKey.isNotBlank()) { "API Key 不能为空" }
@@ -111,7 +113,7 @@ class AiChatServiceImpl @Inject constructor(
 
         val model = connection.defaultModel?.takeIf { it.isNotBlank() }
             ?: DEFAULT_MODEL
-        val request = buildRequest(model, messages, connection.paramsJson, stream = true)
+        val request = buildRequest(model, messages, samplingParams, stream = true)
         val endpoint = "${connection.baseUrl.trimEnd('/')}/chat/completions"
 
         try {

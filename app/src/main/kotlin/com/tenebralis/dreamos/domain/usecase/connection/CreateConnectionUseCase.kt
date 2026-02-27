@@ -5,6 +5,7 @@ import com.tenebralis.dreamos.domain.repository.ApiConnectionRepository
 import com.tenebralis.dreamos.domain.repository.AuthRepository
 import java.util.UUID
 import javax.inject.Inject
+import kotlinx.serialization.json.JsonObject
 
 class CreateConnectionUseCase @Inject constructor(
     private val authRepository: AuthRepository,
@@ -28,10 +29,10 @@ class CreateConnectionUseCase @Inject constructor(
             isSynced = true,
             isActive = isActive,
             defaultModel = draft.defaultModel?.trim()?.takeIf { it.isNotEmpty() },
-            systemPrompt = draft.systemPrompt?.trim()?.takeIf { it.isNotEmpty() },
-            paramsJson = draft.paramsJson,
+            systemPrompt = null,
+            paramsJson = JsonObject(emptyMap()),
             headersTemplateJson = draft.headersTemplateJson,
-            configJson = draft.toConfigJsonObject(),
+            configJson = JsonObject(emptyMap()),
             createdAt = null,
             updatedAt = null
         )

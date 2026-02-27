@@ -4,6 +4,7 @@ import com.tenebralis.dreamos.data.remote.ai.ChatCompletionResponse
 import com.tenebralis.dreamos.data.remote.ai.ChatMessage
 import com.tenebralis.dreamos.domain.model.ApiConnection
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.json.JsonObject
 
 /**
  * AI Chat Completions 调用接口。
@@ -15,25 +16,29 @@ interface AiChatService {
     /**
      * 非流式调用 Chat Completions。
      *
-     * @param connection active 连接配置（baseUrl/model/headers/params）
+     * @param connection active 连接配置（baseUrl/model/headers）
      * @param apiKey 解密后的 API Key
      * @param messages 已组装好的上下文消息列表
+     * @param samplingParams Preset 中的采样参数（temperature/top_p 等）
      * @return ChatCompletionResponse 包含 assistant 回复
      */
     suspend fun chatCompletion(
         connection: ApiConnection,
         apiKey: String,
-        messages: List<ChatMessage>
+        messages: List<ChatMessage>,
+        samplingParams: JsonObject
     ): Result<ChatCompletionResponse>
 
     /**
      * 流式调用 Chat Completions（M4-P2 实现）。
      *
+     * @param samplingParams Preset 中的采样参数
      * @return 逐块返回的 content 文本 Flow
      */
     fun chatCompletionStream(
         connection: ApiConnection,
         apiKey: String,
-        messages: List<ChatMessage>
+        messages: List<ChatMessage>,
+        samplingParams: JsonObject
     ): Flow<Result<String>>
 }

@@ -15,7 +15,7 @@ import kotlinx.serialization.json.encodeToJsonElement
  */
 @Serializable
 data class ConnectionConfig(
-    @SerialName("stream_enabled") val streamEnabled: Boolean = true,
+
     @SerialName("timeout_seconds") val timeoutSeconds: Int = 120,
     @SerialName("retry_count") val retryCount: Int = 3
 ) {

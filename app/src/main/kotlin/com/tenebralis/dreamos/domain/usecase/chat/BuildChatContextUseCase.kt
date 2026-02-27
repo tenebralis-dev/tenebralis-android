@@ -24,14 +24,13 @@ import kotlinx.serialization.json.JsonPrimitive
  * 按 PRD §8 多层上下文编排用例。
  *
  * 上下文层次（缺失时静默跳过，不中断）：
- * 1. 系统 Prompt（来自 connection.systemPrompt，由调用方传入）
- * 2. 世界观 — worlds.prompt_lore_text + rules_json + ai_context_json
- * 3. 身份 — user_world_identities.prompt_identity_text + persona_json
- * 4. 存档 — world_save_states.prompt_progress_text + state_json
- * 5. NPC 设定 — npcs.prompt_npc_text + persona_json
- * 6. 关系 — user_npc_relationships（M5 实现，当前跳过）
- * 7. 全局记忆 — global_memories TopN
- * 8. 近期对话消息
+ * 1. 世界观 — worlds.prompt_lore_text + rules_json + ai_context_json
+ * 2. 身份 — user_world_identities.prompt_identity_text + persona_json
+ * 3. 存档 — world_save_states.prompt_progress_text + state_json
+ * 4. NPC 设定 — npcs.prompt_npc_text + persona_json
+ * 5. 关系 — user_npc_relationships（M5 实现，当前跳过）
+ * 6. 全局记忆 — global_memories TopN
+ * 7. 近期对话消息
  */
 class BuildChatContextUseCase @Inject constructor(
     private val conversationRepository: ConversationRepository,
@@ -51,14 +50,12 @@ class BuildChatContextUseCase @Inject constructor(
      * 组装聊天上下文。
      *
      * @param conversationId 会话 ID
-     * @param systemPrompt   连接配置中的系统 Prompt（可为 null）
      * @param recentMessageCount 近期消息条数上限
      * @param memoryTopN 全局记忆召回上限
      * @return 组装好的 [ChatMessage] 列表（system + 历史 user/assistant）
      */
     suspend operator fun invoke(
         conversationId: String,
-        systemPrompt: String? = null,
         recentMessageCount: Int = 50,
         memoryTopN: Int = 20
     ): Result<List<ChatMessage>> = runCatching {
@@ -67,12 +64,7 @@ class BuildChatContextUseCase @Inject constructor(
         // ── 组装 system message ──
         val systemParts = mutableListOf<String>()
 
-        // 1. 系统 Prompt
-        systemPrompt?.trim()?.takeIf { it.isNotEmpty() }?.let {
-            systemParts += "[系统 Prompt]\n$it"
-        }
-
-        // 2. 世界层
+        // 1. 世界层
         appendWorldContext(conversation.saveId, systemParts)
 
         // 3. 身份层 + 4. 存档层

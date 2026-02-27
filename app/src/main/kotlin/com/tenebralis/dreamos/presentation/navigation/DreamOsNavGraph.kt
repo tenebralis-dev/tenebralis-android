@@ -342,7 +342,28 @@ fun DreamOsNavGraph(
 
         // ─── 预设管理（兼容 SillyTavern 预设）───────────────────────
         composable(Screen.Preset.route) {
-            FeaturePlaceholderScreen(title = "预设")
+            com.tenebralis.dreamos.presentation.screens.preset.PresetListScreen(
+                onBackClick = { navController.popBackStack() },
+                onNavigateToEdit = { presetId ->
+                    navController.navigate(Screen.PresetEdit.createRoute(presetId)) {
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
+        // ─── 预设编辑详情 ──────────────────────────────────────
+        composable(
+            route = Screen.PresetEdit.route,
+            arguments = listOf(
+                navArgument(Screen.PresetEdit.ARG_PRESET_ID) {
+                    type = NavType.StringType
+                }
+            )
+        ) {
+            com.tenebralis.dreamos.presentation.screens.preset.PresetEditScreen(
+                onBackClick = { navController.popBackStack() }
+            )
         }
 
         // ─── 通用功能占位 ────────────────────────────────────

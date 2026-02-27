@@ -3,11 +3,11 @@ package com.tenebralis.dreamos.presentation.screens.connection
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenebralis.dreamos.domain.model.ApiConnection
-import com.tenebralis.dreamos.domain.model.ConnectionConfig
 import com.tenebralis.dreamos.domain.model.ServiceType
 import com.tenebralis.dreamos.domain.usecase.connection.ConnectionDraft
 import com.tenebralis.dreamos.domain.usecase.connection.CreateConnectionUseCase
 import com.tenebralis.dreamos.domain.usecase.connection.DeleteConnectionUseCase
+import com.tenebralis.dreamos.domain.usecase.connection.FetchModelsUseCase
 import com.tenebralis.dreamos.domain.usecase.connection.GetConnectionSecretUseCase
 import com.tenebralis.dreamos.domain.usecase.connection.GetConnectionsUseCase
 import com.tenebralis.dreamos.domain.usecase.connection.SaveConnectionSecretUseCase
@@ -25,10 +25,6 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.doubleOrNull
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonPrimitive
 
 @HiltViewModel
 class ConnectionViewModel @Inject constructor(
@@ -39,7 +35,8 @@ class ConnectionViewModel @Inject constructor(
     private val setActiveConnectionUseCase: SetActiveConnectionUseCase,
     private val saveConnectionSecretUseCase: SaveConnectionSecretUseCase,
     private val getConnectionSecretUseCase: GetConnectionSecretUseCase,
-    private val testConnectionUseCase: TestConnectionUseCase
+    private val testConnectionUseCase: TestConnectionUseCase,
+    private val fetchModelsUseCase: FetchModelsUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ConnectionUiState())
@@ -92,37 +89,7 @@ class ConnectionViewModel @Inject constructor(
             is ConnectionEvent.DefaultModelChanged ->
                 updateForm { copy(defaultModel = event.value) }
 
-            // ── 结构化 AI 参数 ──
-            is ConnectionEvent.TemperatureChanged ->
-                updateForm { copy(temperature = event.value) }
-
-            is ConnectionEvent.MaxTokensChanged ->
-                updateForm { copy(maxTokens = event.value) }
-
-            is ConnectionEvent.TopPChanged ->
-                updateForm { copy(topP = event.value) }
-
-            is ConnectionEvent.FrequencyPenaltyChanged ->
-                updateForm { copy(frequencyPenalty = event.value) }
-
-            is ConnectionEvent.PresencePenaltyChanged ->
-                updateForm { copy(presencePenalty = event.value) }
-
-            is ConnectionEvent.StreamEnabledChanged ->
-                updateForm { copy(streamEnabled = event.value) }
-
             // ── 高级配置 ──
-            is ConnectionEvent.SystemPromptChanged ->
-                updateForm { copy(systemPrompt = event.value) }
-
-            is ConnectionEvent.ParamsJsonOverrideChanged ->
-                updateForm {
-                    copy(
-                        paramsJsonOverride = event.value,
-                        paramsJsonError = validateJsonInstant(event.value, "paramsJson")
-                    )
-                }
-
             is ConnectionEvent.HeadersTemplateJsonChanged ->
                 updateForm {
                     copy(
@@ -139,6 +106,7 @@ class ConnectionViewModel @Inject constructor(
             ConnectionEvent.Save -> saveConnection()
             ConnectionEvent.SetAsDefault -> setAsDefault()
             ConnectionEvent.TestConnection -> testConnection()
+            ConnectionEvent.FetchModels -> fetchModels()
 
             is ConnectionEvent.RequestDelete ->
                 _uiState.update { it.copy(pendingDeleteConnectionId = event.connectionId) }
@@ -428,6 +396,50 @@ class ConnectionViewModel @Inject constructor(
         }
     }
 
+    private fun fetchModels() {
+        val form = _uiState.value.form
+        if (form.isFetchingModels) return
+        if (form.baseUrl.isBlank()) {
+            _uiState.update { it.copy(errorMessage = "请先填写 Base URL") }
+            return
+        }
+
+        viewModelScope.launch {
+            updateForm { copy(isFetchingModels = true) }
+
+            val headersJson = parseJsonObject(
+                form.headersTemplateJson, "headersTemplateJson"
+            ).getOrElse {
+                updateForm { copy(isFetchingModels = false) }
+                _uiState.update { it.copy(errorMessage = "Headers 模板 JSON 格式错误") }
+                return@launch
+            }
+
+            fetchModelsUseCase(
+                baseUrl = form.baseUrl.trim().trimEnd('/'),
+                apiKey = form.apiKey,
+                connectionId = _uiState.value.editingConnectionId,
+                headersTemplateJson = headersJson
+            ).fold(
+                onSuccess = { models ->
+                    updateForm {
+                        copy(
+                            availableModels = models,
+                            isFetchingModels = false
+                        )
+                    }
+                    _uiState.update {
+                        it.copy(infoMessage = "已拉取 ${models.size} 个模型")
+                    }
+                },
+                onFailure = { error ->
+                    updateForm { copy(isFetchingModels = false) }
+                    _uiState.update { it.copy(errorMessage = mapError(error)) }
+                }
+            )
+        }
+    }
+
     private fun confirmDelete() {
         val state = _uiState.value
         val connectionId = state.pendingDeleteConnectionId ?: return
@@ -480,60 +492,18 @@ class ConnectionViewModel @Inject constructor(
     }
 
     private fun buildDraft(form: ConnectionFormState): Result<ConnectionDraft> = runCatching {
-        val paramsJson = buildParamsJson(form)
         val headersTemplateJson = parseJsonObject(
             form.headersTemplateJson,
             "headersTemplateJson"
         ).getOrThrow()
-
-        val config = ConnectionConfig(
-            streamEnabled = form.streamEnabled
-        )
 
         ConnectionDraft(
             name = form.name,
             serviceType = form.serviceType.serialName,
             baseUrl = form.baseUrl.trim().trimEnd('/'),
             defaultModel = form.defaultModel,
-            systemPrompt = form.systemPrompt,
-            paramsJson = paramsJson,
             headersTemplateJson = headersTemplateJson,
-            config = config
         )
-    }
-
-    /**
-     * 构建 paramsJson：
-     * - 如果用户填写了原始 JSON 覆盖，以覆盖为准
-     * - 否则从结构化滑块/输入框构建
-     */
-    private fun buildParamsJson(form: ConnectionFormState): JsonObject {
-        val overrideText = form.paramsJsonOverride.trim()
-        if (overrideText.isNotBlank() && overrideText != "{}") {
-            return parseJsonObject(overrideText, "paramsJson").getOrThrow()
-        }
-
-        val map = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
-
-        map["temperature"] = JsonPrimitive(form.temperature.toDouble())
-
-        form.maxTokens.trim().toIntOrNull()?.let {
-            map["max_tokens"] = JsonPrimitive(it)
-        }
-
-        form.topP.trim().toDoubleOrNull()?.let {
-            map["top_p"] = JsonPrimitive(it)
-        }
-
-        if (form.frequencyPenalty != 0.0f) {
-            map["frequency_penalty"] = JsonPrimitive(form.frequencyPenalty.toDouble())
-        }
-
-        if (form.presencePenalty != 0.0f) {
-            map["presence_penalty"] = JsonPrimitive(form.presencePenalty.toDouble())
-        }
-
-        return JsonObject(map)
     }
 
     private fun parseJsonObject(rawValue: String, fieldName: String): Result<JsonObject> = runCatching {
@@ -546,21 +516,11 @@ class ConnectionViewModel @Inject constructor(
     // ── 双向转换 ──
 
     private fun ApiConnection.toFormState(): ConnectionFormState {
-        val config = ConnectionConfig.fromJsonObject(configJson)
-
         return ConnectionFormState(
             name = name,
             serviceType = ServiceType.fromSerialName(serviceType),
             baseUrl = baseUrl,
             defaultModel = defaultModel.orEmpty(),
-            systemPrompt = systemPrompt.orEmpty(),
-            temperature = paramsJson.floatParam("temperature") ?: 0.7f,
-            maxTokens = paramsJson.intParam("max_tokens")?.toString().orEmpty(),
-            topP = paramsJson.doubleParam("top_p")?.toString().orEmpty(),
-            frequencyPenalty = paramsJson.floatParam("frequency_penalty") ?: 0.0f,
-            presencePenalty = paramsJson.floatParam("presence_penalty") ?: 0.0f,
-            streamEnabled = config.streamEnabled,
-            paramsJsonOverride = "",
             headersTemplateJson = headersTemplateJson.toPrettyString(),
             apiKey = "",
             hasExistingApiKey = false,
@@ -572,15 +532,6 @@ class ConnectionViewModel @Inject constructor(
         if (isEmpty()) return "{}"
         return json.encodeToString(JsonObject.serializer(), this)
     }
-
-    private fun JsonObject.floatParam(key: String): Float? =
-        this[key]?.jsonPrimitive?.doubleOrNull?.toFloat()
-
-    private fun JsonObject.doubleParam(key: String): Double? =
-        this[key]?.jsonPrimitive?.doubleOrNull
-
-    private fun JsonObject.intParam(key: String): Int? =
-        this[key]?.jsonPrimitive?.intOrNull
 
     // ── 实时校验 ──
 

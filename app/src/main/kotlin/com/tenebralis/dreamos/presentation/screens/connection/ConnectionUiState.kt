@@ -9,25 +9,17 @@ data class ConnectionFormState(
     val serviceType: ServiceType = ServiceType.OPENAI_COMPAT,
     val baseUrl: String = "",
     val defaultModel: String = "",
-    val systemPrompt: String = "",
-    // 结构化 AI 参数（Slider / 数字输入）
-    val temperature: Float = 0.7f,
-    val maxTokens: String = "",           // 空 = 不设置
-    val topP: String = "",                // 空 = 不设置
-    val frequencyPenalty: Float = 0.0f,
-    val presencePenalty: Float = 0.0f,
-    val streamEnabled: Boolean = true,
-    // 高级：原始 JSON 覆盖
-    val paramsJsonOverride: String = "",  // 非空时覆盖上方结构化参数
     val headersTemplateJson: String = "{}",
     // 密钥
     val apiKey: String = "",
     val hasExistingApiKey: Boolean = false,
     val existingApiKeyMask: String = "",  // "sk-...xxxx"
+    // 模型列表
+    val availableModels: List<String> = emptyList(),
+    val isFetchingModels: Boolean = false,
     // 实时校验
     val baseUrlError: String? = null,
     val nameError: String? = null,
-    val paramsJsonError: String? = null,
     val headersJsonError: String? = null,
 )
 

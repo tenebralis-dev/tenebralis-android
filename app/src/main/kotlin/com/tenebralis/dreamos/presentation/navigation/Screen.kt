@@ -151,6 +151,12 @@ sealed class Screen(val route: String) {
     /** 预设管理（兼容 SillyTavern 预设） */
     data object Preset : Screen("preset")
 
+    /** 预设编辑详情 */
+    data object PresetEdit : Screen("preset_edit/{presetId}") {
+        const val ARG_PRESET_ID = "presetId"
+        fun createRoute(presetId: String) = "preset_edit/${Uri.encode(presetId)}"
+    }
+
     /** 自定义页面（壁纸/图标/配色/字体） */
     data object Customize : Screen("customize")
 

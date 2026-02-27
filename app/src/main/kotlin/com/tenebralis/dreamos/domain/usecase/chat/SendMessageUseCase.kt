@@ -1,9 +1,9 @@
 package com.tenebralis.dreamos.domain.usecase.chat
 
 import android.util.Log
-import com.tenebralis.dreamos.domain.model.ConnectionConfig
 import com.tenebralis.dreamos.domain.model.ConversationMessage
 import com.tenebralis.dreamos.domain.model.enums.MessageRole
+import com.tenebralis.dreamos.domain.repository.AiPresetRepository
 import com.tenebralis.dreamos.domain.repository.ApiConnectionRepository
 import com.tenebralis.dreamos.domain.repository.AuthRepository
 import com.tenebralis.dreamos.domain.repository.ConnectionSecretRepository
@@ -18,8 +18,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * 完整消息发送用例：user 落库 → 组装上下文 → AI 调用 → assistant 落库。
@@ -36,6 +39,7 @@ class SendMessageUseCase @Inject constructor(
     private val messageRepository: MessageRepository,
     private val apiConnectionRepository: ApiConnectionRepository,
     private val connectionSecretRepository: ConnectionSecretRepository,
+    private val aiPresetRepository: AiPresetRepository,
     private val buildChatContextUseCase: BuildChatContextUseCase,
     private val aiChatService: AiChatService,
     private val updateConversationLastMessageUseCase: UpdateConversationLastMessageUseCase,
@@ -75,15 +79,18 @@ class SendMessageUseCase @Inject constructor(
 
         // ── 3. 组装上下文 ──
         val contextMessages = buildChatContextUseCase(
-            conversationId = normalizedConversationId,
-            systemPrompt = connection.systemPrompt
+            conversationId = normalizedConversationId
         ).getOrThrow()
+
+        // ── 3.5 加载活跃 Preset 的采样参数 ──
+        val samplingParams = loadSamplingParams()
 
         // ── 4. AI 调用 ──
         val aiResult = aiChatService.chatCompletion(
             connection = connection,
             apiKey = apiKey,
-            messages = contextMessages
+            messages = contextMessages,
+            samplingParams = samplingParams
         )
 
         if (aiResult.isFailure) {
@@ -180,23 +187,27 @@ class SendMessageUseCase @Inject constructor(
         // ── 3. 组装上下文 ──
         val contextMessages = try {
             buildChatContextUseCase(
-                conversationId = normalizedConversationId,
-                systemPrompt = connection.systemPrompt
+                conversationId = normalizedConversationId
             ).getOrThrow()
         } catch (e: Throwable) {
             emit(StreamEvent.AiError("上下文组装失败：${e.message ?: "未知错误"}"))
             return@flow
         }
 
-        // ── 4. 根据 config_json.stream_enabled 选择流式/非流式 ──
-        val config = ConnectionConfig.fromJsonObject(connection.configJson)
+        // ── 3.5 加载活跃 Preset 的采样参数 ──
+        val samplingParams = loadSamplingParams()
 
-        if (!config.streamEnabled) {
+        // ── 4. 根据 Preset 的 stream_openai 选择流式/非流式 ──
+        val streamEnabled = samplingParams["stream_openai"]
+            ?.jsonPrimitive?.booleanOrNull ?: true
+
+        if (!streamEnabled) {
             // 非流式路径：一次性获取完整回复，仍用 StreamEvent 通知 UI
             val aiResult = aiChatService.chatCompletion(
                 connection = connection,
                 apiKey = apiKey,
-                messages = contextMessages
+                messages = contextMessages,
+                samplingParams = samplingParams
             )
             if (aiResult.isFailure) {
                 val errorMessage = aiResult.exceptionOrNull()?.message ?: "AI 调用失败"
@@ -237,7 +248,8 @@ class SendMessageUseCase @Inject constructor(
             aiChatService.chatCompletionStream(
                 connection = connection,
                 apiKey = apiKey,
-                messages = contextMessages
+                messages = contextMessages,
+                samplingParams = samplingParams
             ).collect { result ->
                 // 在每个 chunk 之间检查协程是否被取消
                 currentCoroutineContext().ensureActive()
@@ -312,6 +324,18 @@ class SendMessageUseCase @Inject constructor(
     }
 
     // ── 内部辅助方法 ──
+
+    /**
+     * 从 Preset 仓库中加载活跃 Preset 的采样参数。
+     * 若无 Preset 则返回空 JsonObject（使用 AI Service 默认值）。
+     */
+    private suspend fun loadSamplingParams(): JsonObject {
+        return runCatching {
+            val presets = aiPresetRepository.getByUser().first().getOrThrow()
+            presets.firstOrNull()?.presetJson ?: JsonObject(emptyMap())
+        }.getOrDefault(JsonObject(emptyMap()))
+    }
+
 
     /**
      * 保存流式生成中的部分 assistant 内容（中断或失败时使用）。

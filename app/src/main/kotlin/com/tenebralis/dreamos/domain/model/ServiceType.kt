@@ -3,18 +3,16 @@ package com.tenebralis.dreamos.domain.model
 /**
  * API 服务类型枚举。
  *
- * 替代原有的自由文本 serviceType，提供预设选项与默认 Base URL。
+ * 当前仅支持 OpenAI 兼容协议；CUSTOM 保留供特殊场景使用。
  * 数据库中仍以小写字符串存储（如 "openai_compat"），通过 [fromSerialName] 解析。
+ * 旧值（openai_official / anthropic / google）会自动回退为 OPENAI_COMPAT。
  */
 enum class ServiceType(
     val displayName: String,
     val serialName: String,
     val defaultBaseUrl: String?
 ) {
-    OPENAI_COMPAT("OpenAI 兼容 / 中转站", "openai_compat", null),
-    OPENAI_OFFICIAL("OpenAI 官方", "openai_official", "https://api.openai.com/v1"),
-    ANTHROPIC("Claude", "anthropic", "https://api.anthropic.com/v1"),
-    GOOGLE("Gemini", "google", "https://generativelanguage.googleapis.com/v1beta/openai"),
+    OPENAI_COMPAT("OpenAI 兼容", "openai_compat", null),
     CUSTOM("自定义", "custom", null);
 
     companion object {
