@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.DataObject
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Event
@@ -57,6 +58,7 @@ fun dreamOsHomePages(): List<List<HomeAppItem>> {
         ),
         listOf(
             HomeAppItem("预设", Icons.Filled.Layers, Screen.Preset.route),
+            HomeAppItem("上下文", Icons.Filled.DataObject, Screen.Context.route),
             HomeAppItem("自定义", Icons.Filled.Tune, Screen.Customize.route),
             HomeAppItem("连接", Icons.Filled.Link, Screen.Connection.route),
             HomeAppItem("记忆", Icons.Filled.Bookmark, Screen.Memory.route),

@@ -366,6 +366,31 @@ fun DreamOsNavGraph(
             )
         }
 
+        // ─── 上下文管理 ────────────────────────────────────────
+        composable(Screen.Context.route) {
+            com.tenebralis.dreamos.presentation.screens.context.ContextScreen(
+                onBack = { navController.popBackStack() },
+                onLogClick = { logId ->
+                    navController.navigate(Screen.ContextLogDetail.createRoute(logId)) {
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
+        composable(
+            route = Screen.ContextLogDetail.route,
+            arguments = listOf(
+                navArgument(Screen.ContextLogDetail.ARG_LOG_ID) {
+                    type = NavType.StringType
+                }
+            )
+        ) {
+            com.tenebralis.dreamos.presentation.screens.context.ContextLogDetailScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
         // ─── 通用功能占位 ────────────────────────────────────
         composable(
             route = Screen.FeaturePlaceholder.route,

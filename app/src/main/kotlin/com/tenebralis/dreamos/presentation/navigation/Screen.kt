@@ -160,6 +160,15 @@ sealed class Screen(val route: String) {
     /** 自定义页面（壁纸/图标/配色/字体） */
     data object Customize : Screen("customize")
 
+    /** 上下文管理页面 */
+    data object Context : Screen("context")
+
+    /** 上下文日志详情 */
+    data object ContextLogDetail : Screen("context_log/{logId}") {
+        const val ARG_LOG_ID = "logId"
+        fun createRoute(logId: Long) = "context_log/$logId"
+    }
+
     /**
      * 通用功能占位路由
      *

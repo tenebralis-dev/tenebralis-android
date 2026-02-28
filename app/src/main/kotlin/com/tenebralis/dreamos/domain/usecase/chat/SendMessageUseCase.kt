@@ -11,6 +11,7 @@ import com.tenebralis.dreamos.domain.repository.MessageRepository
 import com.tenebralis.dreamos.domain.service.AiChatService
 import com.tenebralis.dreamos.domain.usecase.event.GameEventParser
 import com.tenebralis.dreamos.domain.usecase.event.ProcessGameEventsUseCase
+import com.tenebralis.dreamos.domain.usecase.context.SaveContextLogUseCase
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
@@ -44,7 +45,8 @@ class SendMessageUseCase @Inject constructor(
     private val aiChatService: AiChatService,
     private val updateConversationLastMessageUseCase: UpdateConversationLastMessageUseCase,
     private val gameEventParser: GameEventParser,
-    private val processGameEventsUseCase: ProcessGameEventsUseCase
+    private val processGameEventsUseCase: ProcessGameEventsUseCase,
+    private val saveContextLogUseCase: SaveContextLogUseCase
 ) {
 
     /**
@@ -192,6 +194,16 @@ class SendMessageUseCase @Inject constructor(
         } catch (e: Throwable) {
             emit(StreamEvent.AiError("上下文组装失败：${e.message ?: "未知错误"}"))
             return@flow
+        }
+
+        // ── 3.1 异步保存上下文日志 ──
+        runCatching {
+            val fullPrompt = contextMessages.joinToString("\n") { "[${it.role}] ${it.content}" }
+            saveContextLogUseCase(
+                conversationId = normalizedConversationId,
+                layers = buildChatContextUseCase.lastLayers,
+                fullPromptText = fullPrompt
+            )
         }
 
         // ── 3.5 加载活跃 Preset 的采样参数 ──

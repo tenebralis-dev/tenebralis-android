@@ -205,4 +205,18 @@ abstract class RepositoryModule {
     abstract fun bindAiPresetRepository(
         impl: com.tenebralis.dreamos.data.repository.AiPresetRepositoryImpl
     ): com.tenebralis.dreamos.domain.repository.AiPresetRepository
+
+    // ─── Context Manager ─────────────────────────────────
+
+    @Binds
+    @Singleton
+    abstract fun bindContextLogRepository(
+        impl: com.tenebralis.dreamos.data.repository.ContextLogRepositoryImpl
+    ): com.tenebralis.dreamos.domain.repository.ContextLogRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindContextSettingsRepository(
+        impl: com.tenebralis.dreamos.data.repository.ContextSettingsRepositoryImpl
+    ): com.tenebralis.dreamos.domain.repository.ContextSettingsRepository
 }
