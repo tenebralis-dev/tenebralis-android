@@ -103,10 +103,15 @@ private fun buildResolveDreamEntryUseCase(saveId: String): ResolveDreamEntryUseC
         override suspend fun create(world: World): Result<World> = Result.success(world)
         override suspend fun update(world: World): Result<World> = Result.success(world)
         override suspend fun delete(worldId: String): Result<Unit> = Result.success(Unit)
+        override suspend fun getByName(name: String): Result<World?> = Result.success(null)
     }
     val identityRepository = object : IdentityRepository {
         override fun getByWorld(worldId: String): Flow<Result<List<UserWorldIdentity>>> {
             return flowOf(Result.success(listOf(identity)))
+        }
+
+        override suspend fun getById(identityId: String): Result<UserWorldIdentity> {
+            return Result.success(identity)
         }
 
         override suspend fun create(identity: UserWorldIdentity): Result<UserWorldIdentity> {
@@ -126,6 +131,10 @@ private fun buildResolveDreamEntryUseCase(saveId: String): ResolveDreamEntryUseC
             return flowOf(Result.success(listOf(saveState)))
         }
 
+        override suspend fun getById(saveId: String): Result<WorldSaveState> {
+            return Result.success(saveState)
+        }
+
         override suspend fun create(saveState: WorldSaveState): Result<WorldSaveState> {
             return Result.success(saveState)
         }
@@ -143,7 +152,7 @@ private fun buildResolveDreamEntryUseCase(saveId: String): ResolveDreamEntryUseC
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
-private class MainDispatcherRule(
+class MainDispatcherRule(
     private val dispatcher: TestDispatcher = UnconfinedTestDispatcher()
 ) : TestWatcher() {
 

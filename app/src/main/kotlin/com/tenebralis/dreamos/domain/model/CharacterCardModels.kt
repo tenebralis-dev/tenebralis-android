@@ -13,6 +13,7 @@ data class CharacterCardData(
     val worldBook: WorldBookData?,
     val regexScripts: List<RegexScriptData>,
     val other: Map<String, String>,
+    val tags: List<String>,
     val chatDate: String,
     val createDate: String
 )

@@ -49,7 +49,9 @@ class WorldViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             getWorldsUseCase().fold(
-                onSuccess = { worlds ->
+                onSuccess = { allWorlds ->
+                    // 隐藏系统世界「__reality__」
+                    val worlds = allWorlds.filter { it.name != "__reality__" }
                     _uiState.update { state ->
                         val selectedId = state.selectedWorldId?.takeIf { selected ->
                             worlds.any { it.id == selected }

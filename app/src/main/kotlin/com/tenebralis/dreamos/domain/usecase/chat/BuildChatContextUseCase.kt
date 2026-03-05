@@ -3,6 +3,7 @@ package com.tenebralis.dreamos.domain.usecase.chat
 import com.tenebralis.dreamos.data.remote.ai.ChatMessage
 import com.tenebralis.dreamos.domain.model.ContextLayer
 import com.tenebralis.dreamos.domain.model.ContextSettings
+import com.tenebralis.dreamos.domain.model.PersonaJsonData
 import com.tenebralis.dreamos.domain.model.enums.AiVisibility
 import com.tenebralis.dreamos.domain.model.enums.MessageRole
 import com.tenebralis.dreamos.domain.model.enums.TaskStatus
@@ -19,8 +20,11 @@ import com.tenebralis.dreamos.domain.repository.SaveStateRepository
 import com.tenebralis.dreamos.domain.repository.TaskRepository
 import com.tenebralis.dreamos.domain.repository.WorldRepository
 import com.tenebralis.dreamos.domain.usecase.context.SaveContextLogUseCase
+import com.tenebralis.dreamos.domain.usecase.worldlore.ActivateWorldLoreUseCase
+import com.tenebralis.dreamos.domain.usecase.worldlore.EntryActivationState
 import javax.inject.Inject
 import kotlinx.coroutines.flow.first
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -51,8 +55,13 @@ class BuildChatContextUseCase @Inject constructor(
     private val calendarRepository: CalendarRepository,
     private val pomodoroRepository: PomodoroRepository,
     private val taskRepository: TaskRepository,
-    private val contextSettingsRepository: ContextSettingsRepository
+    private val contextSettingsRepository: ContextSettingsRepository,
+    private val activateWorldLoreUseCase: ActivateWorldLoreUseCase
 ) {
+
+    // 会话级世界书激活状态（不持久化）
+    private val worldLoreActivationStates = mutableMapOf<String, EntryActivationState>()
+    private var worldLoreTurnCounter = 0
 
     /**
      * 最近一次组装的各层信息，供 [SaveContextLogUseCase] 读取。
@@ -85,11 +94,22 @@ class BuildChatContextUseCase @Inject constructor(
         // ── 组装 system message ──
         val systemParts = mutableListOf<String>()
 
-        // 1. 世界层
-        appendWorldContext(conversation.saveId, systemParts, enabledLayers, layersMap)
+        // 判断是否为「现实世界」对话 — 跳过世界/身份/存档层
+        val save = runCatching {
+            saveStateRepository.getById(conversation.saveId).getOrThrow()
+        }.getOrNull()
+        val world = save?.let { s ->
+            runCatching { worldRepository.getById(s.worldId).getOrThrow() }.getOrNull()
+        }
+        val isRealityWorld = world?.name == GetOrCreateDefaultSaveUseCase.REALITY_WORLD_NAME
 
-        // 3. 身份层 + 4. 存档层
-        appendIdentityAndSaveContext(conversation.saveId, systemParts, enabledLayers, layersMap)
+        if (!isRealityWorld) {
+            // 1. 世界层
+            appendWorldContext(conversation.saveId, systemParts, enabledLayers, layersMap)
+
+            // 3. 身份层 + 4. 存档层
+            appendIdentityAndSaveContext(conversation.saveId, systemParts, enabledLayers, layersMap)
+        }
 
         // 5. NPC 设定
         appendNpcContext(conversation.npcId, systemParts, enabledLayers, layersMap)
@@ -107,6 +127,17 @@ class BuildChatContextUseCase @Inject constructor(
 
         // 7.5 AI 事件指令格式（M7+）
         appendGameEventInstruction(systemParts, enabledLayers, layersMap)
+
+        // 8. 世界书激活（World Lore Book）
+        appendWorldLoreBookContext(
+            recentMessages = messageRepository.getByConversation(conversationId)
+                .first().getOrNull()?.sortedBy { it.seq }?.takeLast(effectiveRecentCount)
+                ?.map { it.content } ?: emptyList(),
+            parts = systemParts,
+            enabledLayers = enabledLayers,
+            layersMap = layersMap
+        )
+        worldLoreTurnCounter++
 
         // ── 构建消息列表 ──
         val messages = mutableListOf<ChatMessage>()
@@ -260,6 +291,8 @@ class BuildChatContextUseCase @Inject constructor(
         }
     }
 
+    private val personaJson = Json { ignoreUnknownKeys = true }
+
     private suspend fun appendNpcContext(
         npcId: String,
         parts: MutableList<String>,
@@ -278,18 +311,54 @@ class BuildChatContextUseCase @Inject constructor(
             return
         }
 
-        val sb = StringBuilder("[NPC 设定]")
-        sb.append("\nnpc_id: ").append(npc.id)
+        // 尝试解析 PersonaJsonData（角色卡导入的 NPC 会有完整数据）
+        val persona = runCatching {
+            personaJson.decodeFromJsonElement(PersonaJsonData.serializer(), npc.personaJson)
+        }.getOrNull()
+
+        val sb = StringBuilder()
+
+        // 角色基本信息（始终包含）
+        sb.append("[角色信息]")
         sb.append("\n名称: ").append(npc.name)
         npc.description?.trim()?.takeIf { it.isNotEmpty() }?.let {
-            sb.append("\n简介: ").append(it)
+            sb.append("\n").append(it)
         }
         npc.promptNpcText?.trim()?.takeIf { it.isNotEmpty() }?.let {
             sb.append("\n").append(it)
         }
-        if (npc.personaJson.isNotEmpty()) {
-            sb.append("\n--- NPC 人格 ---\n").append(flattenJson(npc.personaJson))
+
+        // 角色性格（从 persona_json 提取）
+        persona?.personality?.trim()?.takeIf { it.isNotEmpty() }?.let {
+            sb.append("\n\n[角色性格]\n").append(it)
         }
+
+        // 场景设定
+        persona?.scenario?.trim()?.takeIf { it.isNotEmpty() }?.let {
+            sb.append("\n\n[场景设定]\n").append(it)
+        }
+
+        // 对话示例
+        persona?.mesExample?.trim()?.takeIf { it.isNotEmpty() }?.let {
+            sb.append("\n\n[对话示例]\n").append(it)
+        }
+
+        // 角色级系统提示词
+        persona?.systemPrompt?.trim()?.takeIf { it.isNotEmpty() }?.let {
+            sb.append("\n\n[角色系统提示词]\n").append(it)
+        }
+
+        // 历史后指令（jailbreak 位置）
+        persona?.postHistoryInstructions?.trim()?.takeIf { it.isNotEmpty() }?.let {
+            sb.append("\n\n[历史后指令]\n").append(it)
+        }
+
+        // 深度提示词
+        persona?.depthPrompt?.prompt?.trim()?.takeIf { it.isNotEmpty() }?.let {
+            val dp = persona.depthPrompt!!
+            sb.append("\n\n[深度提示词 (depth=${dp.depth}, role=${dp.role})]\n").append(it)
+        }
+
         val content = sb.toString()
         parts += content
         layersMap[ContextSettings.LAYER_NPC_PERSONA] = ContextLayer(true, content, estimateTokens(content))
@@ -397,6 +466,47 @@ class BuildChatContextUseCase @Inject constructor(
     private fun JsonObject.isNotEmpty(): Boolean = this.entries.isNotEmpty()
 
     private fun estimateTokens(text: String): Int = (text.length / 4).coerceAtLeast(0)
+
+    // ── 世界书激活层 ──
+
+    private suspend fun appendWorldLoreBookContext(
+        recentMessages: List<String>,
+        parts: MutableList<String>,
+        enabledLayers: Set<String>,
+        layersMap: MutableMap<String, ContextLayer>
+    ) {
+        if (ContextSettings.LAYER_WORLD_LORE_BOOK !in enabledLayers) {
+            layersMap[ContextSettings.LAYER_WORLD_LORE_BOOK] = ContextLayer(false, null, 0)
+            return
+        }
+
+        val result = runCatching {
+            activateWorldLoreUseCase(
+                recentMessages = recentMessages,
+                userInput = recentMessages.lastOrNull() ?: "",
+                activationStates = worldLoreActivationStates,
+                currentTurn = worldLoreTurnCounter
+            ).getOrThrow()
+        }.getOrNull()
+
+        if (result == null || result.activatedCount == 0) {
+            layersMap[ContextSettings.LAYER_WORLD_LORE_BOOK] = ContextLayer(true, null, 0, 0)
+            return
+        }
+
+        val sb = StringBuilder("[世界书]（激活 ${result.activatedCount}/${result.totalCandidateCount} 条目）")
+        result.beforeMain?.let { sb.append("\n").append(it) }
+        result.afterMain?.let { sb.append("\n").append(it) }
+
+        val content = sb.toString()
+        parts += content
+        layersMap[ContextSettings.LAYER_WORLD_LORE_BOOK] = ContextLayer(
+            enabled = true,
+            content = content,
+            tokens = result.totalTokens,
+            count = result.activatedCount
+        )
+    }
 
     // ── M7+ 活跃任务上下文 ──
 

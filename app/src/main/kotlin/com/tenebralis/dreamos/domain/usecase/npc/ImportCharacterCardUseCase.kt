@@ -8,7 +8,9 @@ import com.tenebralis.dreamos.domain.repository.AuthRepository
 import com.tenebralis.dreamos.domain.repository.NpcRepository
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import java.io.InputStream
 import java.util.UUID
@@ -134,6 +136,61 @@ class ImportCharacterCardUseCase @Inject constructor(
                 it.startsWith("https://", ignoreCase = true)
         } ?: false
 
+        // 序列化 world_book
+        val characterBookJson = card.worldBook?.let { wb ->
+            val entriesArray = wb.entries.map { entry ->
+                JsonObject(buildMap {
+                    put("index", JsonPrimitive(entry.index))
+                    put("name", JsonPrimitive(entry.name))
+                    put("content", JsonPrimitive(entry.content))
+                    put("enabled", JsonPrimitive(entry.enabled))
+                    put("activationMode", JsonPrimitive(entry.activationMode))
+                    put("key", JsonArray(entry.key.map { JsonPrimitive(it) }))
+                    put("secondaryKey", JsonArray(entry.secondaryKey.map { JsonPrimitive(it) }))
+                    put("selectiveLogic", JsonPrimitive(entry.selectiveLogic))
+                    put("order", JsonPrimitive(entry.order))
+                    put("depth", JsonPrimitive(entry.depth))
+                    put("position", JsonPrimitive(entry.position))
+                    entry.role?.let { put("role", JsonPrimitive(it)) }
+                    entry.caseSensitive?.let { put("caseSensitive", JsonPrimitive(it)) }
+                    put("excludeRecursion", JsonPrimitive(entry.excludeRecursion))
+                    put("preventRecursion", JsonPrimitive(entry.preventRecursion))
+                    put("probability", JsonPrimitive(entry.probability))
+                })
+            }
+            JsonObject(mapOf(
+                "name" to JsonPrimitive(wb.name),
+                "entries" to JsonArray(entriesArray)
+            ))
+        }
+
+        // 序列化 regex_scripts
+        val regexScriptsJson = card.regexScripts.map { rs ->
+            JsonObject(buildMap {
+                put("id", JsonPrimitive(rs.id))
+                put("name", JsonPrimitive(rs.name))
+                put("enabled", JsonPrimitive(rs.enabled))
+                put("findRegex", JsonPrimitive(rs.findRegex))
+                put("replaceRegex", JsonPrimitive(rs.replaceRegex))
+                put("trimRegex", JsonArray(rs.trimRegex.map { JsonPrimitive(it) }))
+                put("targets", JsonArray(rs.targets.map { JsonPrimitive(it) }))
+                put("view", JsonArray(rs.view.map { JsonPrimitive(it) }))
+                put("runOnEdit", JsonPrimitive(rs.runOnEdit))
+                put("macroMode", JsonPrimitive(rs.macroMode))
+                rs.minDepth?.let { put("minDepth", JsonPrimitive(it)) }
+                rs.maxDepth?.let { put("maxDepth", JsonPrimitive(it)) }
+            })
+        }
+
+        // 解析 depth_prompt（从 other 中的 extensions 透传）
+        val depthPrompt = card.other["depth_prompt_text"]?.let { prompt ->
+            com.tenebralis.dreamos.domain.model.DepthPromptData(
+                prompt = prompt,
+                depth = card.other["depth_prompt_depth"]?.toIntOrNull() ?: 4,
+                role = card.other["depth_prompt_role"] ?: "system"
+            )
+        }
+
         val persona = PersonaJsonData(
             source = "sillytavern",
             sourceFormatVersion = "v2",
@@ -148,7 +205,11 @@ class ImportCharacterCardUseCase @Inject constructor(
             postHistoryInstructions = card.other["post_history_instructions"],
             creatorNotes = card.other["creator_notes"],
             creator = card.other["creator"],
-            characterVersion = card.other["character_version"]
+            characterVersion = card.other["character_version"],
+            tags = card.tags,
+            depthPrompt = depthPrompt,
+            characterBook = characterBookJson,
+            regexScripts = regexScriptsJson
         )
         val personaJsonString = json.encodeToString(persona)
         val personaJsonObject = json.parseToJsonElement(personaJsonString).jsonObject

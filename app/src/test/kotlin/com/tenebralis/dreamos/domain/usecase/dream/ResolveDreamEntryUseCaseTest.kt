@@ -198,6 +198,10 @@ private class StubWorldRepository(
     override suspend fun delete(worldId: String): Result<Unit> {
         return Result.failure(UnsupportedOperationException("Not needed in this test"))
     }
+
+    override suspend fun getByName(name: String): Result<World?> {
+        return Result.failure(UnsupportedOperationException("Not needed in this test"))
+    }
 }
 
 private class StubIdentityRepository(
@@ -206,6 +210,10 @@ private class StubIdentityRepository(
 
     override fun getByWorld(worldId: String): Flow<Result<List<UserWorldIdentity>>> {
         return flowOf(onGetByWorld(worldId))
+    }
+
+    override suspend fun getById(identityId: String): Result<UserWorldIdentity> {
+        return Result.failure(UnsupportedOperationException("Not needed in this test"))
     }
 
     override suspend fun create(identity: UserWorldIdentity): Result<UserWorldIdentity> {
@@ -227,6 +235,10 @@ private class StubSaveStateRepository(
 
     override fun getByIdentity(identityId: String): Flow<Result<List<WorldSaveState>>> {
         return flowOf(onGetByIdentity(identityId))
+    }
+
+    override suspend fun getById(saveId: String): Result<WorldSaveState> {
+        return Result.failure(UnsupportedOperationException("Not needed in this test"))
     }
 
     override suspend fun create(saveState: WorldSaveState): Result<WorldSaveState> {

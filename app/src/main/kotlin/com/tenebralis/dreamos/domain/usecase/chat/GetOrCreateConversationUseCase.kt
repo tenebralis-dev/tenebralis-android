@@ -11,7 +11,8 @@ class GetOrCreateConversationUseCase @Inject constructor(
     suspend operator fun invoke(
         saveId: String,
         npcId: String,
-        threadKey: String = DEFAULT_THREAD_KEY
+        threadKey: String = DEFAULT_THREAD_KEY,
+        presetId: String? = null
     ): Result<Conversation> = runCatching {
         val normalizedSaveId = saveId.trim()
         val normalizedNpcId = npcId.trim()
@@ -24,7 +25,8 @@ class GetOrCreateConversationUseCase @Inject constructor(
         repository.getOrCreate(
             saveId = normalizedSaveId,
             npcId = normalizedNpcId,
-            threadKey = normalizedThreadKey
+            threadKey = normalizedThreadKey,
+            presetId = presetId
         ).getOrThrow()
     }
 

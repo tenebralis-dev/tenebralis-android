@@ -3,6 +3,9 @@ package com.tenebralis.dreamos.presentation.screens.chat
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tenebralis.dreamos.domain.repository.AiPresetRepository
+import com.tenebralis.dreamos.domain.repository.ApiConnectionRepository
+import com.tenebralis.dreamos.domain.repository.ConversationRepository
 import com.tenebralis.dreamos.domain.usecase.chat.GetMessagesUseCase
 import com.tenebralis.dreamos.domain.usecase.chat.SendMessageUseCase
 import com.tenebralis.dreamos.domain.usecase.chat.StreamEvent
@@ -15,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -23,7 +27,10 @@ import kotlinx.coroutines.launch
 class ChatDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val getMessagesUseCase: GetMessagesUseCase,
-    private val sendMessageUseCase: SendMessageUseCase
+    private val sendMessageUseCase: SendMessageUseCase,
+    private val conversationRepository: ConversationRepository,
+    private val aiPresetRepository: AiPresetRepository,
+    private val apiConnectionRepository: ApiConnectionRepository
 ) : ViewModel() {
 
     private val conversationId: String =
@@ -59,6 +66,13 @@ class ChatDetailViewModel @Inject constructor(
 
             ChatDetailEvent.ClearInfo ->
                 _uiState.update { it.copy(infoMessage = null) }
+
+            ChatDetailEvent.ShowSettings -> showSettings()
+            ChatDetailEvent.DismissSettings ->
+                _uiState.update { it.copy(showSettings = false) }
+
+            is ChatDetailEvent.ChangePreset -> changePreset(event.presetId)
+            is ChatDetailEvent.ChangeApiConnection -> changeApiConnection(event.connectionId)
         }
     }
 
@@ -80,6 +94,117 @@ class ChatDetailViewModel @Inject constructor(
                             isLoading = false,
                             errorMessage = UseCaseErrorMapper.toMessage(error)
                         )
+                    }
+                }
+            )
+
+            // 加载当前会话的设置信息
+            loadConversationSettings()
+        }
+    }
+
+    /**
+     * 加载当前会话绑定的 preset 和 API connection 信息。
+     */
+    private suspend fun loadConversationSettings() {
+        runCatching {
+            val conversation = conversationRepository.getById(conversationId).getOrThrow()
+
+            // 加载可用预设和连接
+            val presets = runCatching {
+                aiPresetRepository.getByUser().first().getOrThrow()
+            }.getOrNull().orEmpty()
+
+            val connections = runCatching {
+                apiConnectionRepository.getAll().first().getOrThrow()
+            }.getOrNull().orEmpty()
+
+            val currentPreset = conversation.presetId?.let { pid ->
+                presets.firstOrNull { it.id == pid }
+            }
+            val currentConnection = conversation.apiConnectionId?.let { cid ->
+                connections.firstOrNull { it.id == cid }
+            }
+
+            _uiState.update {
+                it.copy(
+                    availablePresets = presets,
+                    availableConnections = connections,
+                    currentPresetId = conversation.presetId,
+                    currentPresetName = currentPreset?.name,
+                    currentConnectionId = conversation.apiConnectionId,
+                    currentConnectionName = currentConnection?.name
+                )
+            }
+        }
+    }
+
+    /**
+     * 打开设置面板（先刷新可用选项）。
+     */
+    private fun showSettings() {
+        viewModelScope.launch {
+            loadConversationSettings()
+            _uiState.update { it.copy(showSettings = true) }
+        }
+    }
+
+    /**
+     * 切换会话绑定的预设。
+     */
+    private fun changePreset(presetId: String?) {
+        viewModelScope.launch {
+            conversationRepository.updateSettings(
+                conversationId = conversationId,
+                presetId = presetId,
+                apiConnectionId = _uiState.value.currentConnectionId
+            ).fold(
+                onSuccess = {
+                    val presetName = presetId?.let { pid ->
+                        _uiState.value.availablePresets.firstOrNull { it.id == pid }?.name
+                    }
+                    _uiState.update {
+                        it.copy(
+                            currentPresetId = presetId,
+                            currentPresetName = presetName,
+                            infoMessage = if (presetId != null) "已切换预设：$presetName" else "已清除预设"
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(errorMessage = UseCaseErrorMapper.toMessage(error))
+                    }
+                }
+            )
+        }
+    }
+
+    /**
+     * 切换会话绑定的 API 连接。
+     */
+    private fun changeApiConnection(connectionId: String?) {
+        viewModelScope.launch {
+            conversationRepository.updateSettings(
+                conversationId = conversationId,
+                presetId = _uiState.value.currentPresetId,
+                apiConnectionId = connectionId
+            ).fold(
+                onSuccess = {
+                    val connName = connectionId?.let { cid ->
+                        _uiState.value.availableConnections.firstOrNull { it.id == cid }?.name
+                    }
+                    _uiState.update {
+                        it.copy(
+                            currentConnectionId = connectionId,
+                            currentConnectionName = connName,
+                            infoMessage = if (connectionId != null) "已切换连接：$connName" else "已使用默认连接"
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(errorMessage = UseCaseErrorMapper.toMessage(error))
                     }
                 }
             )
@@ -198,4 +323,3 @@ class ChatDetailViewModel @Inject constructor(
         }
     }
 }
-

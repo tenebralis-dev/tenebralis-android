@@ -151,10 +151,15 @@ private class FakeConversationRepository : ConversationRepository {
         return flowOf(Result.success(emptyList()))
     }
 
+    override suspend fun getById(conversationId: String): Result<Conversation> {
+        return Result.failure(UnsupportedOperationException("Not needed in this test"))
+    }
+
     override suspend fun getOrCreate(
         saveId: String,
         npcId: String,
-        threadKey: String
+        threadKey: String,
+        presetId: String?
     ): Result<Conversation> {
         return Result.failure(UnsupportedOperationException("Not needed in this test"))
     }
@@ -167,6 +172,14 @@ private class FakeConversationRepository : ConversationRepository {
         updateCallCount += 1
         lastUpdatedConversationId = conversationId
         lastUpdatedSummary = summary
+        return Result.success(Unit)
+    }
+
+    override suspend fun updateSettings(
+        conversationId: String,
+        presetId: String?,
+        apiConnectionId: String?
+    ): Result<Unit> {
         return Result.success(Unit)
     }
 }

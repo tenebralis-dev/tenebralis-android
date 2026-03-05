@@ -1,6 +1,8 @@
 package com.tenebralis.dreamos.presentation.screens.chat
 
 import com.tenebralis.dreamos.data.remote.ai.ChatCompletionUsage
+import com.tenebralis.dreamos.domain.model.AiPreset
+import com.tenebralis.dreamos.domain.model.ApiConnection
 import com.tenebralis.dreamos.domain.model.ConversationMessage
 
 data class ChatDetailUiState(
@@ -15,7 +17,15 @@ data class ChatDetailUiState(
     val aiErrorMessage: String? = null,
     val streamingContent: String? = null,
     val infoMessage: String? = null,
-    val lastAiUsage: ChatCompletionUsage? = null
+    val lastAiUsage: ChatCompletionUsage? = null,
+    /** 设置面板状态 */
+    val showSettings: Boolean = false,
+    val availablePresets: List<AiPreset> = emptyList(),
+    val availableConnections: List<ApiConnection> = emptyList(),
+    val currentPresetId: String? = null,
+    val currentPresetName: String? = null,
+    val currentConnectionId: String? = null,
+    val currentConnectionName: String? = null
 ) {
     val emptyState: Boolean get() = !isLoading && messages.isEmpty()
 }

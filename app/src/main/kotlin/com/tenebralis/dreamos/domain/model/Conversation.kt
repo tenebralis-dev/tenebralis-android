@@ -15,6 +15,8 @@ data class Conversation(
     val title: String?,
     val summary: String?,
     val pinnedContextText: String?,
+    val presetId: String?,
+    val apiConnectionId: String?,
     val lastMessageAt: String?,
     val createdAt: String?,
     val updatedAt: String?

@@ -83,6 +83,23 @@ class WorldRepositoryImpl @Inject constructor(
             }
     }
 
+    override suspend fun getByName(name: String): Result<World?> = runCatching {
+        val userId = requireCurrentUserId()
+        val normalizedName = name.trim()
+        require(normalizedName.isNotEmpty()) { "name 不能为空" }
+
+        supabase.from(TABLE_WORLDS)
+            .select {
+                filter {
+                    eq("user_id", userId)
+                    eq("name", normalizedName)
+                }
+            }
+            .decodeList<WorldDto>()
+            .firstOrNull()
+            ?.toDomain()
+    }
+
     private suspend fun fetchByUser(userId: String): List<WorldDto> {
         return supabase.from(TABLE_WORLDS)
             .select {

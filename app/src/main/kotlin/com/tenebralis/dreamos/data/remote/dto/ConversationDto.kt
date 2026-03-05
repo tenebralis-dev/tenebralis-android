@@ -18,6 +18,8 @@ data class ConversationDto(
     val title: String? = null,
     val summary: String? = null,
     @SerialName("pinned_context_text") val pinnedContextText: String? = null,
+    @SerialName("preset_id") val presetId: String? = null,
+    @SerialName("api_connection_id") val apiConnectionId: String? = null,
     @SerialName("last_message_at") val lastMessageAt: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null

@@ -16,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PostAdd
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -27,6 +28,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
@@ -36,6 +38,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.tenebralis.dreamos.domain.model.AiPreset
 import com.tenebralis.dreamos.domain.model.Conversation
 import com.tenebralis.dreamos.domain.model.Npc
 
@@ -97,6 +101,28 @@ fun ChatListScreen(
         )
     }
 
+    // 预设选择底部弹窗
+    if (uiState.showPresetPicker) {
+        PresetPickerBottomSheet(
+            presets = uiState.availablePresets,
+            onDismiss = { viewModel.onEvent(ChatListEvent.DismissPresetPicker) },
+            onSelect = { presetId ->
+                viewModel.onEvent(ChatListEvent.ConfirmPresetSelection(presetId))
+            }
+        )
+    }
+
+    // 新建线程命名弹窗
+    if (uiState.showNewThreadDialog) {
+        NewThreadDialog(
+            defaultName = uiState.newThreadDefaultName,
+            onDismiss = { viewModel.onEvent(ChatListEvent.DismissNewThreadDialog) },
+            onConfirm = { threadName ->
+                viewModel.onEvent(ChatListEvent.ConfirmNewThread(threadName))
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -120,15 +146,13 @@ fun ChatListScreen(
             )
         },
         floatingActionButton = {
-            if (!uiState.requiresSaveSelection) {
-                FloatingActionButton(
-                    onClick = { viewModel.onEvent(ChatListEvent.ShowCreateNpcDialog) }
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Add,
-                        contentDescription = "创建 NPC"
-                    )
-                }
+            FloatingActionButton(
+                onClick = { viewModel.onEvent(ChatListEvent.ShowCreateNpcDialog) }
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = "创建 NPC"
+                )
             }
         },
         snackbarHost = {
@@ -143,8 +167,21 @@ fun ChatListScreen(
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            if (uiState.requiresSaveSelection) {
-                SaveRequiredCard(onBackClick = onBackClick)
+            if (uiState.isInitializing) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    Spacer(modifier = Modifier.padding(horizontal = 6.dp))
+                    Text(
+                        text = "正在初始化...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 return@Column
             }
 
@@ -184,7 +221,8 @@ fun ChatListScreen(
                         NpcItemCard(
                             npc = npc,
                             isLoading = uiState.isCreatingConversation && uiState.selectedNpcId == npc.id,
-                            onClick = { viewModel.onEvent(ChatListEvent.SelectNpc(npc.id)) }
+                            onClick = { viewModel.onEvent(ChatListEvent.SelectNpc(npc.id)) },
+                            onNewThread = { viewModel.onEvent(ChatListEvent.ShowNewThreadDialog(npc.id)) }
                         )
                     }
                     item {
@@ -212,6 +250,139 @@ fun ChatListScreen(
             }
         }
     }
+}
+
+// ─── 预设选择底部弹窗 ──────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PresetPickerBottomSheet(
+    presets: List<AiPreset>,
+    onDismiss: () -> Unit,
+    onSelect: (presetId: String?) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = "选择预设",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            // 预设列表
+            presets.forEach { preset ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSelect(preset.id) },
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp)
+                    ) {
+                        Text(
+                            text = preset.name,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        preset.source?.takeIf { it.isNotBlank() }?.let { source ->
+                            Text(
+                                text = "来源: $source",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
+            // "不使用预设" 选项
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 4.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            )
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onSelect(null) },
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f)
+                )
+            ) {
+                Text(
+                    text = "不使用预设",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 14.dp)
+                )
+            }
+
+            // 底部安全间距
+            Spacer(modifier = Modifier.padding(bottom = 16.dp))
+        }
+    }
+}
+
+// ─── 新建线程弹窗 ──────────────────────────────────────
+
+@Composable
+private fun NewThreadDialog(
+    defaultName: String,
+    onDismiss: () -> Unit,
+    onConfirm: (threadName: String) -> Unit
+) {
+    var threadName by rememberSaveable { mutableStateOf(defaultName) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("新建对话线程") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "为新线程命名（将作为 thread_key）",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = threadName,
+                    onValueChange = { threadName = it },
+                    label = { Text("线程名称") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(threadName) },
+                enabled = threadName.trim().isNotEmpty()
+            ) {
+                Text("创建")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
 }
 
 // ─── 创建 NPC 弹窗 ───────────────────────────────────────
@@ -271,7 +442,7 @@ private fun CreateNpcDialog(
     )
 }
 
-// ─── 子组�?──────────────────────────────────────────────
+// ─── 子组件 ──────────────────────────────────────────────
 
 @Composable
 private fun SectionHeader(title: String) {
@@ -283,37 +454,7 @@ private fun SectionHeader(title: String) {
     )
 }
 
-@Composable
-private fun SaveRequiredCard(
-    onBackClick: () -> Unit
-) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = "尚未选择存档",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = "请先进入\"梦境\"选择 world/identity/save，再进入对话列表。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            TextButton(onClick = onBackClick) {
-                Text("返回")
-            }
-        }
-    }
-}
+
 
 @Composable
 private fun EmptyNpcCard(
@@ -384,7 +525,8 @@ private fun EmptyConversationCard() {
 private fun NpcItemCard(
     npc: Npc,
     isLoading: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onNewThread: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -423,6 +565,18 @@ private fun NpcItemCard(
                     modifier = Modifier.size(16.dp),
                     strokeWidth = 2.dp
                 )
+            } else {
+                IconButton(
+                    onClick = onNewThread,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.PostAdd,
+                        contentDescription = "新建线程",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
     }

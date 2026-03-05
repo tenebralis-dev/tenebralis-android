@@ -7,6 +7,7 @@ import com.tenebralis.dreamos.domain.repository.AiPresetRepository
 import com.tenebralis.dreamos.domain.repository.ApiConnectionRepository
 import com.tenebralis.dreamos.domain.repository.AuthRepository
 import com.tenebralis.dreamos.domain.repository.ConnectionSecretRepository
+import com.tenebralis.dreamos.domain.repository.ConversationRepository
 import com.tenebralis.dreamos.domain.repository.MessageRepository
 import com.tenebralis.dreamos.domain.service.AiChatService
 import com.tenebralis.dreamos.domain.usecase.event.GameEventParser
@@ -38,6 +39,7 @@ import kotlinx.serialization.json.jsonPrimitive
 class SendMessageUseCase @Inject constructor(
     private val authRepository: AuthRepository,
     private val messageRepository: MessageRepository,
+    private val conversationRepository: ConversationRepository,
     private val apiConnectionRepository: ApiConnectionRepository,
     private val connectionSecretRepository: ConnectionSecretRepository,
     private val aiPresetRepository: AiPresetRepository,
@@ -71,8 +73,8 @@ class SendMessageUseCase @Inject constructor(
             content = normalizedContent
         )
 
-        // ── 2. 获取 active connection + API Key ──
-        val connection = apiConnectionRepository.getActive().getOrThrow()
+        // ── 2. 获取会话绑定的 API 连接（或全局 active 连接）+ API Key ──
+        val connection = loadApiConnection(normalizedConversationId)
             ?: throw NoConnectionException("请先在设置中配置 API 连接")
 
         val apiKey = connectionSecretRepository.getSecret(connection.id).getOrThrow()
@@ -84,8 +86,8 @@ class SendMessageUseCase @Inject constructor(
             conversationId = normalizedConversationId
         ).getOrThrow()
 
-        // ── 3.5 加载活跃 Preset 的采样参数 ──
-        val samplingParams = loadSamplingParams()
+        // ── 3.5 加载会话绑定 Preset 的采样参数 ──
+        val samplingParams = loadSamplingParams(normalizedConversationId)
 
         // ── 4. AI 调用 ──
         val aiResult = aiChatService.chatCompletion(
@@ -172,8 +174,8 @@ class SendMessageUseCase @Inject constructor(
         )
         emit(StreamEvent.UserMessageSaved(userMessage))
 
-        // ── 2. 获取 active connection + API Key ──
-        val connection = apiConnectionRepository.getActive().getOrThrow()
+        // ── 2. 获取会话绑定的 API 连接（或全局 active 连接）+ API Key ──
+        val connection = loadApiConnection(normalizedConversationId)
         if (connection == null) {
             emit(StreamEvent.AiError("请先在设置中配置 API 连接"))
             return@flow
@@ -206,8 +208,8 @@ class SendMessageUseCase @Inject constructor(
             )
         }
 
-        // ── 3.5 加载活跃 Preset 的采样参数 ──
-        val samplingParams = loadSamplingParams()
+        // ── 3.5 加载会话绑定 Preset 的采样参数 ──
+        val samplingParams = loadSamplingParams(normalizedConversationId)
 
         // ── 4. 根据 Preset 的 stream_openai 选择流式/非流式 ──
         val streamEnabled = samplingParams["stream_openai"]
@@ -338,14 +340,43 @@ class SendMessageUseCase @Inject constructor(
     // ── 内部辅助方法 ──
 
     /**
-     * 从 Preset 仓库中加载活跃 Preset 的采样参数。
-     * 若无 Preset 则返回空 JsonObject（使用 AI Service 默认值）。
+     * 从会话绑定的 Preset 中加载采样参数。
+     * 优先使用会话的 presetId；若无则回退到用户首个 Preset；
+     * 均无时返回空 JsonObject（使用 AI Service 默认值）。
      */
-    private suspend fun loadSamplingParams(): JsonObject {
+    private suspend fun loadSamplingParams(conversationId: String): JsonObject {
         return runCatching {
+            // 优先：从会话绑定的 preset 加载
+            val conversation = conversationRepository.getById(conversationId).getOrThrow()
+            val presetId = conversation.presetId
+            if (presetId != null) {
+                val preset = aiPresetRepository.getById(presetId).getOrNull()
+                if (preset != null) return@runCatching preset.presetJson
+            }
+            // 回退：用户首个 preset
             val presets = aiPresetRepository.getByUser().first().getOrThrow()
             presets.firstOrNull()?.presetJson ?: JsonObject(emptyMap())
         }.getOrDefault(JsonObject(emptyMap()))
+    }
+
+    /**
+     * 加载会话绑定的 API 连接。
+     * 优先使用会话的 apiConnectionId；若无则回退到全局 active 连接。
+     */
+    private suspend fun loadApiConnection(conversationId: String): com.tenebralis.dreamos.domain.model.ApiConnection? {
+        return runCatching {
+            val conversation = conversationRepository.getById(conversationId).getOrThrow()
+            val connId = conversation.apiConnectionId
+            if (connId != null) {
+                // 尝试加载指定连接
+                val allConnections = apiConnectionRepository.getAll()
+                    .first().getOrThrow()
+                val specificConnection = allConnections.firstOrNull { it.id == connId }
+                if (specificConnection != null) return@runCatching specificConnection
+            }
+            // 回退：全局 active
+            apiConnectionRepository.getActive().getOrThrow()
+        }.getOrNull()
     }
 
 

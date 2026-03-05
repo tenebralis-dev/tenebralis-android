@@ -89,6 +89,8 @@ object CharacterCardParser {
             ?: data["extensions"]?.jsonObjectOrNull()?.get("regex_scripts")?.jsonArrayOrNull()
             ?: emptyList()).mapNotNull { parseRegexScript(it) }
 
+        val tags = data["tags"]?.jsonArrayOrNull()?.mapNotNull { it.str() } ?: emptyList()
+
         val chatDate = raw.str("chatDate") ?: raw.str("chat") ?: ""
         val createDate = raw.str("createDate") ?: raw.str("create_date") ?: ""
 
@@ -100,6 +102,7 @@ object CharacterCardParser {
             worldBook = worldBook,
             regexScripts = regexScripts,
             other = extractOtherFields(data),
+            tags = tags,
             chatDate = chatDate,
             createDate = createDate
         )
@@ -121,6 +124,8 @@ object CharacterCardParser {
             ?.mapNotNull { parseRegexScript(it) }
             ?: emptyList()
 
+        val tags = raw["tags"]?.jsonArrayOrNull()?.mapNotNull { it.str() } ?: emptyList()
+
         return CharacterCardData(
             name = name,
             description = description,
@@ -129,6 +134,7 @@ object CharacterCardParser {
             worldBook = worldBook,
             regexScripts = regexScripts,
             other = emptyMap(),
+            tags = tags,
             chatDate = raw.str("chatDate") ?: "",
             createDate = raw.str("createDate") ?: ""
         )

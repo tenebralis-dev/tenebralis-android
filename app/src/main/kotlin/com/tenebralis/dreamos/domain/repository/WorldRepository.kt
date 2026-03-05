@@ -24,4 +24,7 @@ interface WorldRepository {
 
     /** 删除世界（软删除：设置 status = deleted） */
     suspend fun delete(worldId: String): Result<Unit>
+
+    /** 根据名称查找世界（用于系统世界等固定名称查找） */
+    suspend fun getByName(name: String): Result<World?>
 }

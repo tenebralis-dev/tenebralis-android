@@ -14,7 +14,7 @@ class GetOrCreateConversationUseCaseTest {
     @Test
     fun `returns existing conversation when repository finds it`() = runBlocking {
         val existing = buildConversation(id = "conversation-existing")
-        val repository = StubConversationRepository {
+        val repository = StubConversationRepository { _, _, _ ->
             Result.success(existing)
         }
         val useCase = GetOrCreateConversationUseCase(repository)
@@ -32,7 +32,7 @@ class GetOrCreateConversationUseCaseTest {
     @Test
     fun `creates conversation when repository returns newly created`() = runBlocking {
         val created = buildConversation(id = "conversation-created")
-        val repository = StubConversationRepository {
+        val repository = StubConversationRepository { _, _, _ ->
             Result.success(created)
         }
         val useCase = GetOrCreateConversationUseCase(repository)
@@ -50,7 +50,7 @@ class GetOrCreateConversationUseCaseTest {
     @Test
     fun `returns success when repository resolves unique conflict by fallback query`() = runBlocking {
         val conflictResolved = buildConversation(id = "conversation-conflict-resolved")
-        val repository = StubConversationRepository {
+        val repository = StubConversationRepository { _, _, _ ->
             // 模拟 Repository 内部已处理“唯一冲突后回查”并返回成功。
             Result.success(conflictResolved)
         }
@@ -75,10 +75,15 @@ private class StubConversationRepository(
         return flowOf(Result.success(emptyList()))
     }
 
+    override suspend fun getById(conversationId: String): Result<Conversation> {
+        return Result.failure(NotImplementedError("stub"))
+    }
+
     override suspend fun getOrCreate(
         saveId: String,
         npcId: String,
-        threadKey: String
+        threadKey: String,
+        presetId: String?
     ): Result<Conversation> {
         return onGetOrCreate(saveId, npcId, threadKey)
     }
@@ -87,6 +92,14 @@ private class StubConversationRepository(
         conversationId: String,
         lastMessageAt: String,
         summary: String?
+    ): Result<Unit> {
+        return Result.success(Unit)
+    }
+
+    override suspend fun updateSettings(
+        conversationId: String,
+        presetId: String?,
+        apiConnectionId: String?
     ): Result<Unit> {
         return Result.success(Unit)
     }
@@ -102,6 +115,8 @@ private fun buildConversation(id: String): Conversation {
         title = null,
         summary = null,
         pinnedContextText = null,
+        presetId = null,
+        apiConnectionId = null,
         lastMessageAt = null,
         createdAt = null,
         updatedAt = null

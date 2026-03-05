@@ -49,7 +49,8 @@ class ConversationRepositoryImpl @Inject constructor(
     override suspend fun getOrCreate(
         saveId: String,
         npcId: String,
-        threadKey: String
+        threadKey: String,
+        presetId: String?
     ): Result<Conversation> = runCatching {
         val userId = requireCurrentUserId()
         val normalizedSaveId = saveId.trim()
@@ -78,6 +79,8 @@ class ConversationRepositoryImpl @Inject constructor(
             title = null,
             summary = null,
             pinnedContextText = null,
+            presetId = presetId,
+            apiConnectionId = null,
             lastMessageAt = null,
             createdAt = null,
             updatedAt = null
@@ -133,6 +136,38 @@ class ConversationRepositoryImpl @Inject constructor(
             ) {
                 filter {
                     eq("id", normalizedConversationId)
+                    eq("user_id", userId)
+                }
+            }
+    }
+
+    override suspend fun updateSettings(
+        conversationId: String,
+        presetId: String?,
+        apiConnectionId: String?
+    ): Result<Unit> = runCatching {
+        val userId = requireCurrentUserId()
+        val normalizedId = conversationId.trim()
+        require(normalizedId.isNotEmpty()) { "conversationId 不能为空" }
+
+        val existing = supabase.from(TABLE_CONVERSATIONS)
+            .select {
+                filter {
+                    eq("id", normalizedId)
+                    eq("user_id", userId)
+                }
+            }
+            .decodeSingle<ConversationDto>()
+
+        supabase.from(TABLE_CONVERSATIONS)
+            .update(
+                existing.copy(
+                    presetId = presetId,
+                    apiConnectionId = apiConnectionId
+                )
+            ) {
+                filter {
+                    eq("id", normalizedId)
                     eq("user_id", userId)
                 }
             }

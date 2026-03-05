@@ -97,15 +97,53 @@ object DefaultPreset {
                 position = "relative",
                 order = 3
             ),
+            // ── 角色卡兼容插槽 ──
             PromptInfoData(
-                identifier = "npcSetting",
-                name = "NPC 设定",
+                identifier = "charDescription",
+                name = "角色描述",
                 enabled = true,
                 role = "system",
-                content = "{{npcSetting}}",
+                content = "{{charDescription}}",
                 position = "relative",
                 order = 4
             ),
+            PromptInfoData(
+                identifier = "charPersonality",
+                name = "角色性格",
+                enabled = true,
+                role = "system",
+                content = "{{charPersonality}}",
+                position = "relative",
+                order = 5
+            ),
+            PromptInfoData(
+                identifier = "scenario",
+                name = "场景设定",
+                enabled = true,
+                role = "system",
+                content = "{{scenario}}",
+                position = "relative",
+                order = 6
+            ),
+            PromptInfoData(
+                identifier = "dialogueExamples",
+                name = "对话示例",
+                enabled = false,
+                role = "system",
+                content = "{{dialogueExamples}}",
+                position = "relative",
+                order = 7
+            ),
+            PromptInfoData(
+                identifier = "charSystemPrompt",
+                name = "角色系统提示词",
+                enabled = true,
+                role = "system",
+                content = "{{charSystemPrompt}}",
+                position = "relative",
+                order = 8
+            ),
+            // ── 原有上下文层 ──
             PromptInfoData(
                 identifier = "userData",
                 name = "用户数据",
@@ -113,7 +151,7 @@ object DefaultPreset {
                 role = "system",
                 content = "{{userData}}",
                 position = "relative",
-                order = 5
+                order = 9
             ),
             PromptInfoData(
                 identifier = "memory",
@@ -122,7 +160,7 @@ object DefaultPreset {
                 role = "system",
                 content = "{{memory}}",
                 position = "relative",
-                order = 6
+                order = 10
             ),
             PromptInfoData(
                 identifier = "activeTask",
@@ -131,7 +169,7 @@ object DefaultPreset {
                 role = "system",
                 content = "{{activeTask}}",
                 position = "relative",
-                order = 7
+                order = 11
             ),
             PromptInfoData(
                 identifier = "chatHistory",
@@ -140,7 +178,18 @@ object DefaultPreset {
                 role = "system",
                 content = "",
                 position = "relative",
-                order = 8
+                order = 12
+            ),
+            // ── 固定位置插槽 ──
+            PromptInfoData(
+                identifier = "postHistoryInstructions",
+                name = "历史后指令",
+                enabled = true,
+                role = "system",
+                content = "{{postHistoryInstructions}}",
+                position = "fixed",
+                depth = 0,
+                order = 997
             ),
             PromptInfoData(
                 identifier = "gameEvent",

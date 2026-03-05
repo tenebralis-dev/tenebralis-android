@@ -219,4 +219,12 @@ abstract class RepositoryModule {
     abstract fun bindContextSettingsRepository(
         impl: com.tenebralis.dreamos.data.repository.ContextSettingsRepositoryImpl
     ): com.tenebralis.dreamos.domain.repository.ContextSettingsRepository
+
+    // ─── World Lore Book ─────────────────────────────────
+
+    @Binds
+    @Singleton
+    abstract fun bindWorldLoreRepository(
+        impl: com.tenebralis.dreamos.data.repository.WorldLoreRepositoryImpl
+    ): com.tenebralis.dreamos.domain.repository.WorldLoreRepository
 }

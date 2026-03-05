@@ -29,6 +29,7 @@ data class ContextSettings(
         const val LAYER_MEMORIES = "memories"
         const val LAYER_ACTIVE_TASKS = "active_tasks"
         const val LAYER_GAME_EVENTS = "game_events"
+        const val LAYER_WORLD_LORE_BOOK = "world_lore_book"
         const val LAYER_RECENT_MESSAGES = "recent_messages"
 
         val ALL_LAYERS = setOf(
@@ -41,6 +42,7 @@ data class ContextSettings(
             LAYER_MEMORIES,
             LAYER_ACTIVE_TASKS,
             LAYER_GAME_EVENTS,
+            LAYER_WORLD_LORE_BOOK,
             LAYER_RECENT_MESSAGES
         )
 
@@ -55,6 +57,7 @@ data class ContextSettings(
             LAYER_MEMORIES to "全局记忆",
             LAYER_ACTIVE_TASKS to "活跃任务",
             LAYER_GAME_EVENTS to "游戏事件指令",
+            LAYER_WORLD_LORE_BOOK to "世界书",
             LAYER_RECENT_MESSAGES to "近期消息"
         )
 
@@ -69,6 +72,7 @@ data class ContextSettings(
             LAYER_MEMORIES to "🧠",
             LAYER_ACTIVE_TASKS to "📋",
             LAYER_GAME_EVENTS to "🎮",
+            LAYER_WORLD_LORE_BOOK to "📖",
             LAYER_RECENT_MESSAGES to "💬"
         )
     }

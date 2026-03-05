@@ -24,7 +24,8 @@ interface ConversationRepository {
     suspend fun getOrCreate(
         saveId: String,
         npcId: String,
-        threadKey: String
+        threadKey: String,
+        presetId: String? = null
     ): Result<Conversation>
 
     /** 更新会话的 lastMessageAt 和 summary */
@@ -32,5 +33,12 @@ interface ConversationRepository {
         conversationId: String,
         lastMessageAt: String,
         summary: String?
+    ): Result<Unit>
+
+    /** 更新会话的设置（presetId 和 apiConnectionId） */
+    suspend fun updateSettings(
+        conversationId: String,
+        presetId: String?,
+        apiConnectionId: String?
     ): Result<Unit>
 }

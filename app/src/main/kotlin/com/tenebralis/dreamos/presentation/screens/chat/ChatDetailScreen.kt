@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,8 +22,10 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -32,6 +35,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
@@ -40,10 +44,14 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -51,6 +59,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.tenebralis.dreamos.domain.model.AiPreset
+import com.tenebralis.dreamos.domain.model.ApiConnection
 import com.tenebralis.dreamos.domain.model.ConversationMessage
 import com.tenebralis.dreamos.domain.model.enums.MessageRole
 
@@ -64,12 +74,33 @@ fun ChatDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
 
-    // 自动滚动到底部（新消息或流式内容更新时触发）
+    // ── 智能自动滚动 ──
+    var isAtBottom by remember { mutableStateOf(true) }
+
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            val layoutInfo = listState.layoutInfo
+            val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val totalItems = layoutInfo.totalItemsCount
+            totalItems <= 1 || lastVisible >= totalItems - 2
+        }.collect { atBottom ->
+            isAtBottom = atBottom
+        }
+    }
+
     val scrollTarget = uiState.messages.size + if (uiState.streamingContent != null) 1 else 0
     LaunchedEffect(scrollTarget, uiState.streamingContent) {
-        val totalItems = uiState.messages.size + if (uiState.streamingContent != null) 1 else 0
-        if (totalItems > 0) {
-            listState.animateScrollToItem(totalItems - 1)
+        if (isAtBottom) {
+            val totalItems = uiState.messages.size + if (uiState.streamingContent != null) 1 else 0
+            if (totalItems > 0) {
+                listState.scrollToItem(totalItems - 1)
+            }
+        }
+    }
+
+    LaunchedEffect(uiState.isSending) {
+        if (uiState.isSending) {
+            isAtBottom = true
         }
     }
 
@@ -87,6 +118,23 @@ fun ChatDetailScreen(
         }
     }
 
+    // 设置底部弹窗
+    if (uiState.showSettings) {
+        ChatSettingsBottomSheet(
+            presets = uiState.availablePresets,
+            connections = uiState.availableConnections,
+            currentPresetId = uiState.currentPresetId,
+            currentConnectionId = uiState.currentConnectionId,
+            onDismiss = { viewModel.onEvent(ChatDetailEvent.DismissSettings) },
+            onSelectPreset = { presetId ->
+                viewModel.onEvent(ChatDetailEvent.ChangePreset(presetId))
+            },
+            onSelectConnection = { connectionId ->
+                viewModel.onEvent(ChatDetailEvent.ChangeApiConnection(connectionId))
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -100,6 +148,13 @@ fun ChatDetailScreen(
                     }
                 },
                 actions = {
+                    // 设置按钮
+                    IconButton(onClick = { viewModel.onEvent(ChatDetailEvent.ShowSettings) }) {
+                        Icon(
+                            imageVector = Icons.Filled.Settings,
+                            contentDescription = "设置"
+                        )
+                    }
                     IconButton(onClick = { viewModel.onEvent(ChatDetailEvent.Refresh) }) {
                         Icon(
                             imageVector = Icons.Filled.Refresh,
@@ -121,6 +176,30 @@ fun ChatDetailScreen(
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
+            // 当前设置摘要条
+            val settingSummary = buildSettingSummary(
+                presetName = uiState.currentPresetName,
+                connectionName = uiState.currentConnectionName
+            )
+            if (settingSummary.isNotEmpty()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                        .clickable { viewModel.onEvent(ChatDetailEvent.ShowSettings) },
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+                    )
+                ) {
+                    Text(
+                        text = settingSummary,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
+                }
+            }
+
             if (uiState.isLoading) {
                 Row(
                     modifier = Modifier
@@ -164,7 +243,7 @@ fun ChatDetailScreen(
                 }
             }
 
-            // AI 正在回复指示器（仅在还没收到第一个 chunk 时显示）
+            // AI 正在回复指示器
             AnimatedVisibility(
                 visible = uiState.isAiResponding && uiState.streamingContent == null,
                 enter = fadeIn(),
@@ -253,7 +332,6 @@ fun ChatDetailScreen(
                 ),
                 trailingIcon = {
                     if (uiState.isAiResponding) {
-                        // 流式生成中：显示停止按钮
                         IconButton(
                             onClick = { viewModel.onEvent(ChatDetailEvent.StopStreaming) }
                         ) {
@@ -289,6 +367,154 @@ fun ChatDetailScreen(
         }
     }
 }
+
+// ─── 设置摘要 ────────────────────────────────────────────
+
+private fun buildSettingSummary(presetName: String?, connectionName: String?): String {
+    val parts = mutableListOf<String>()
+    if (connectionName != null) parts.add("API: $connectionName")
+    if (presetName != null) parts.add("预设: $presetName")
+    return parts.joinToString("  ·  ")
+}
+
+// ─── 设置底部弹窗 ────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ChatSettingsBottomSheet(
+    presets: List<AiPreset>,
+    connections: List<ApiConnection>,
+    currentPresetId: String?,
+    currentConnectionId: String?,
+    onDismiss: () -> Unit,
+    onSelectPreset: (presetId: String?) -> Unit,
+    onSelectConnection: (connectionId: String?) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            // ── API 连接 ──
+            Text(
+                text = "API 连接",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
+
+            // "使用默认连接" 选项
+            SettingsOptionCard(
+                label = "使用默认连接",
+                sublabel = "使用全局 active 连接",
+                isSelected = currentConnectionId == null,
+                onClick = { onSelectConnection(null) }
+            )
+
+            connections.forEach { connection ->
+                SettingsOptionCard(
+                    label = connection.name,
+                    sublabel = "${connection.serviceType} · ${connection.baseUrl}",
+                    isSelected = connection.id == currentConnectionId,
+                    onClick = { onSelectConnection(connection.id) }
+                )
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 8.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            )
+
+            // ── 预设 ──
+            Text(
+                text = "预设",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
+
+            // "不使用预设" 选项
+            SettingsOptionCard(
+                label = "不使用预设",
+                sublabel = "使用默认采样参数",
+                isSelected = currentPresetId == null,
+                onClick = { onSelectPreset(null) }
+            )
+
+            presets.forEach { preset ->
+                SettingsOptionCard(
+                    label = preset.name,
+                    sublabel = preset.source?.takeIf { it.isNotBlank() }?.let { "来源: $it" },
+                    isSelected = preset.id == currentPresetId,
+                    onClick = { onSelectPreset(preset.id) }
+                )
+            }
+
+            // 底部安全间距
+            Spacer(modifier = Modifier.padding(bottom = 16.dp))
+        }
+    }
+}
+
+@Composable
+private fun SettingsOptionCard(
+    label: String,
+    sublabel: String?,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+            }
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
+                )
+                sublabel?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            if (isSelected) {
+                Icon(
+                    imageVector = Icons.Filled.Check,
+                    contentDescription = "已选择",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+// ─── 消息子组件 ──────────────────────────────────────────
 
 @Composable
 private fun MessageItemCard(message: ConversationMessage) {
