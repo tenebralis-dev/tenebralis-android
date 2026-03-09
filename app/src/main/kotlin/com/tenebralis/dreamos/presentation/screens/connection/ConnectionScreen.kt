@@ -549,7 +549,16 @@ private fun BasicInfoSection(
         label = { Text("Base URL") },
         singleLine = true,
         isError = form.baseUrlError != null,
-        supportingText = form.baseUrlError?.let { { Text(it) } },
+        supportingText = {
+            if (form.baseUrlError != null) {
+                Text(form.baseUrlError)
+            } else if (form.resolvedBaseUrl.isNotBlank()) {
+                Column {
+                    Text("API 对话端点: ${form.chatEndpoint}")
+                    Text("拉取模型端点: ${form.modelsEndpoint}")
+                }
+            }
+        },
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Uri,
             imeAction = ImeAction.Next

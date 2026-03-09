@@ -10,6 +10,10 @@ data class ConnectionFormState(
     val baseUrl: String = "",
     val defaultModel: String = "",
     val headersTemplateJson: String = "{}",
+    // 解析后端点展示
+    val resolvedBaseUrl: String = "",
+    val modelsEndpoint: String = "",
+    val chatEndpoint: String = "",
     // 密钥
     val apiKey: String = "",
     val hasExistingApiKey: Boolean = false,

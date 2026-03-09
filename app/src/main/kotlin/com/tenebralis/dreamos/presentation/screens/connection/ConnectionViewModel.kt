@@ -63,28 +63,38 @@ class ConnectionViewModel @Inject constructor(
                 updateForm { copy(name = event.value, nameError = null) }
 
             is ConnectionEvent.ServiceTypeSelected -> {
+                val form = _uiState.value.form
+                val newBaseUrl = if (form.baseUrl.isBlank() || isDefaultBaseUrl(form.baseUrl)) {
+                    event.value.defaultBaseUrl.orEmpty()
+                } else {
+                    form.baseUrl
+                }
+                val sanitized = sanitizeBaseUrl(newBaseUrl)
                 updateForm {
-                    val newBaseUrl = if (baseUrl.isBlank() || isDefaultBaseUrl(baseUrl)) {
-                        event.value.defaultBaseUrl.orEmpty()
-                    } else {
-                        baseUrl
-                    }
                     copy(
                         serviceType = event.value,
                         baseUrl = newBaseUrl,
-                        baseUrlError = null
+                        baseUrlError = null,
+                        resolvedBaseUrl = sanitized,
+                        modelsEndpoint = if (sanitized.isNotBlank()) "$sanitized/v1/models" else "",
+                        chatEndpoint = if (sanitized.isNotBlank()) "$sanitized/v1/chat/completions" else ""
                     )
                 }
             }
 
-            is ConnectionEvent.BaseUrlChanged ->
+            is ConnectionEvent.BaseUrlChanged -> {
+                val sanitized = sanitizeBaseUrl(event.value)
                 updateForm {
                     copy(
                         baseUrl = event.value,
                         baseUrlError = validateBaseUrlInstant(event.value),
-                        name = if (name.isBlank()) suggestName(event.value) else name
+                        name = if (name.isBlank()) suggestName(event.value) else name,
+                        resolvedBaseUrl = sanitized,
+                        modelsEndpoint = if (sanitized.isNotBlank()) "$sanitized/v1/models" else "",
+                        chatEndpoint = if (sanitized.isNotBlank()) "$sanitized/v1/chat/completions" else ""
                     )
                 }
+            }
 
             is ConnectionEvent.DefaultModelChanged ->
                 updateForm { copy(defaultModel = event.value) }
@@ -186,13 +196,18 @@ class ConnectionViewModel @Inject constructor(
     }
 
     private fun startCreateWithPreset(serviceType: ServiceType) {
+        val presetUrl = serviceType.defaultBaseUrl.orEmpty()
+        val sanitized = sanitizeBaseUrl(presetUrl)
         _uiState.update {
             it.copy(
                 editingConnectionId = null,
                 form = ConnectionFormState(
                     name = serviceType.displayName,
                     serviceType = serviceType,
-                    baseUrl = serviceType.defaultBaseUrl.orEmpty()
+                    baseUrl = presetUrl,
+                    resolvedBaseUrl = sanitized,
+                    modelsEndpoint = if (sanitized.isNotBlank()) "$sanitized/v1/models" else "",
+                    chatEndpoint = if (sanitized.isNotBlank()) "$sanitized/v1/chat/completions" else ""
                 ),
                 testResult = null,
                 errorMessage = null,
@@ -416,7 +431,7 @@ class ConnectionViewModel @Inject constructor(
             }
 
             fetchModelsUseCase(
-                baseUrl = form.baseUrl.trim().trimEnd('/'),
+                baseUrl = sanitizeBaseUrl(form.baseUrl),
                 apiKey = form.apiKey,
                 connectionId = _uiState.value.editingConnectionId,
                 headersTemplateJson = headersJson
@@ -500,7 +515,7 @@ class ConnectionViewModel @Inject constructor(
         ConnectionDraft(
             name = form.name,
             serviceType = form.serviceType.serialName,
-            baseUrl = form.baseUrl.trim().trimEnd('/'),
+            baseUrl = sanitizeBaseUrl(form.baseUrl),
             defaultModel = form.defaultModel,
             headersTemplateJson = headersTemplateJson,
         )
@@ -516,12 +531,16 @@ class ConnectionViewModel @Inject constructor(
     // ── 双向转换 ──
 
     private fun ApiConnection.toFormState(): ConnectionFormState {
+        val sanitized = sanitizeBaseUrl(baseUrl)
         return ConnectionFormState(
             name = name,
             serviceType = ServiceType.fromSerialName(serviceType),
             baseUrl = baseUrl,
             defaultModel = defaultModel.orEmpty(),
             headersTemplateJson = headersTemplateJson.toPrettyString(),
+            resolvedBaseUrl = sanitized,
+            modelsEndpoint = if (sanitized.isNotBlank()) "$sanitized/v1/models" else "",
+            chatEndpoint = if (sanitized.isNotBlank()) "$sanitized/v1/chat/completions" else "",
             apiKey = "",
             hasExistingApiKey = false,
             existingApiKeyMask = ""
@@ -597,6 +616,40 @@ class ConnectionViewModel @Inject constructor(
         if (key.isNullOrBlank()) return ""
         if (key.length <= 8) return "****"
         return "${key.take(3)}...${key.takeLast(4)}"
+    }
+
+    /**
+     * 自动清理和格式化用户输入的 Base URL。
+     * - 补充 https:// (如果没有)
+     * - 移除常见的误复制路径如 /chat/completions 或 /v1/chat/completions
+     * - 移除末尾斜杠
+     */
+    private fun sanitizeBaseUrl(url: String): String {
+        var cleanUrl = url.trim()
+        if (cleanUrl.isBlank()) return ""
+
+        if (!cleanUrl.startsWith("http://", ignoreCase = true) && 
+            !cleanUrl.startsWith("https://", ignoreCase = true)) {
+            cleanUrl = "https://$cleanUrl"
+        }
+
+        // 移除用户常见的误输入后缀
+        val suffixesToRemove = listOf(
+            "/v1/chat/completions",
+            "/chat/completions",
+            "/v1/models",
+            "/models",
+            "/v1"
+        )
+        
+        for (suffix in suffixesToRemove) {
+            if (cleanUrl.endsWith(suffix, ignoreCase = true)) {
+                cleanUrl = cleanUrl.dropLast(suffix.length)
+                break 
+            }
+        }
+        
+        return cleanUrl.trimEnd('/')
     }
 
     private fun mapError(error: Throwable): String {

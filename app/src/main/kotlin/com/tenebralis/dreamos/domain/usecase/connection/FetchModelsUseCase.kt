@@ -15,6 +15,9 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.net.UnknownHostException
+import java.net.ConnectException
+import io.ktor.client.plugins.HttpRequestTimeoutException
 
 /**
  * 从 OpenAI 兼容的 /models 端点拉取可用模型列表。
@@ -47,18 +50,36 @@ class FetchModelsUseCase @Inject constructor(
         val resolvedKey = resolveApiKey(apiKey, connectionId)
         val endpoint = "${baseUrl.trimEnd('/')}/models"
 
-        val response = httpClient.get(endpoint) {
-            header(HttpHeaders.Authorization, "Bearer $resolvedKey")
-            header(HttpHeaders.Accept, "application/json")
-            appendTemplateHeaders(headersTemplateJson)
-        }
+        try {
+            val response = httpClient.get(endpoint) {
+                header(HttpHeaders.Authorization, "Bearer $resolvedKey")
+                header(HttpHeaders.Accept, "application/json")
+                appendTemplateHeaders(headersTemplateJson)
+            }
 
-        if (!response.status.isSuccess()) {
-            throw IllegalStateException("拉取模型失败（HTTP ${response.status.value}）")
-        }
+            val body = response.bodyAsText()
 
-        val body = response.bodyAsText()
-        parseModelIds(body)
+            if (!response.status.isSuccess()) {
+                val providerError = extractProviderMessage(body)
+                val status = response.status.value
+                val message = when (status) {
+                    401 -> "认证失败 (401)，请检查 API Key${providerError?.let { "：$it" } ?: ""}"
+                    403 -> "无权限访问 (403)${providerError?.let { "：$it" } ?: ""}"
+                    404 -> "模型列表端点不存在 (404)，请确认 Base URL 是否正确"
+                    else -> "拉取模型失败 (HTTP $status)${providerError?.let { "：$it" } ?: ""}"
+                }
+                throw IllegalStateException(message)
+            }
+
+            parseModelIds(body)
+        } catch (e: Exception) {
+            when (e) {
+                is UnknownHostException -> throw IllegalStateException("无法解析域名，请检查网络或 Base URL 拼写：${e.localizedMessage}")
+                is ConnectException -> throw IllegalStateException("连接服务器失败，请检查网络地址：${e.localizedMessage}")
+                is HttpRequestTimeoutException -> throw IllegalStateException("请求超时，网络状况可能不佳，请重试")
+                else -> throw e
+            }
+        }
     }
 
     private suspend fun resolveApiKey(apiKey: String, connectionId: String?): String {
@@ -102,5 +123,15 @@ class FetchModelsUseCase @Inject constructor(
                 header(key, headerValue)
             }
         }
+    }
+
+    private fun extractProviderMessage(responseBody: String): String? {
+        val parsed = runCatching { json.parseToJsonElement(responseBody) }.getOrNull() ?: return null
+        val root = parsed.jsonObject
+        val errorNode = root["error"] ?: return null
+        return when (errorNode) {
+            is JsonObject -> errorNode["message"]?.jsonPrimitive?.contentOrNull
+            else -> errorNode.toString()
+        }?.takeIf { it.isNotBlank() }
     }
 }
