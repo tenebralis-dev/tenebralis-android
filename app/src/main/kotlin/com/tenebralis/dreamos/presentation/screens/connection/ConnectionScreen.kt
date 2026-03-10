@@ -19,24 +19,29 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -110,7 +115,7 @@ fun ConnectionScreen(
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                             contentDescription = "返回"
                         )
                     }
@@ -118,7 +123,7 @@ fun ConnectionScreen(
                 actions = {
                     IconButton(onClick = { viewModel.onEvent(ConnectionEvent.Refresh) }) {
                         Icon(
-                            imageVector = Icons.Filled.Refresh,
+                            imageVector = Icons.Rounded.Refresh,
                             contentDescription = "刷新"
                         )
                     }
@@ -129,7 +134,7 @@ fun ConnectionScreen(
             FloatingActionButton(
                 onClick = { viewModel.onEvent(ConnectionEvent.StartCreate) }
             ) {
-                Icon(Icons.Filled.Add, contentDescription = "新建连接")
+                Icon(Icons.Rounded.Add, contentDescription = "新建连接")
             }
         },
         snackbarHost = {
@@ -251,7 +256,7 @@ private fun ConnectionListSection(
         return
     }
 
-    state.connections.forEachIndexed { index, connection ->
+    state.connections.forEach { connection ->
         ConnectionListItem(
             state = state,
             connectionId = connection.id,
@@ -264,21 +269,16 @@ private fun ConnectionListSection(
             onSetDefault = { onSetDefault(connection.id) },
             onDelete = { onDelete(connection.id) }
         )
-        if (index < state.connections.lastIndex) {
-            HorizontalDivider(
-                modifier = Modifier.padding(vertical = 4.dp),
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-            )
-        }
     }
 }
 
 @Composable
 private fun EmptyConnectionGuide(onEvent: (ConnectionEvent) -> Unit) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+    OutlinedCard(
+        colors = CardDefaults.outlinedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)
         ),
+        border = CardDefaults.outlinedCardBorder(enabled = true).copy(width = 1.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
@@ -286,26 +286,46 @@ private fun EmptyConnectionGuide(onEvent: (ConnectionEvent) -> Unit) {
                 .fillMaxWidth()
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = "还没有连接配置",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = "连接是与 AI 服务通信的桥梁。选择一个服务快速开始，或点击右下角 + 自定义创建。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Surface(
+                shape = androidx.compose.foundation.shape.CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                modifier = Modifier.size(64.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "还没有连接配置",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "连接是与 AI 服务通信的桥梁。选择一个服务快速开始，或点击右下角 + 自定义创建。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
 
             // 预设快速开始按钮
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 ServiceType.entries.forEach { type ->
-                    OutlinedButton(
+                    FilledTonalButton(
                         onClick = { onEvent(ConnectionEvent.StartCreateWithPreset(type)) },
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -333,13 +353,18 @@ private fun ConnectionListItem(
     onSetDefault: () -> Unit,
     onDelete: () -> Unit
 ) {
-    Card(
-        colors = CardDefaults.cardColors(
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    OutlinedCard(
+        colors = CardDefaults.outlinedCardColors(
             containerColor = if (isActive) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
             } else {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                MaterialTheme.colorScheme.surface
             }
+        ),
+        border = CardDefaults.outlinedCardBorder(isActive).copy(
+            width = if (isActive) 1.5.dp else 1.dp
         ),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -347,8 +372,8 @@ private fun ConnectionListItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onEdit)
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -356,27 +381,64 @@ private fun ConnectionListItem(
             ) {
                 Text(
                     text = name,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f),
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.SemiBold
                 )
                 if (isActive) {
                     Surface(
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        shape = MaterialTheme.shapes.small
+                        shape = androidx.compose.foundation.shape.CircleShape,
+                        color = androidx.compose.ui.graphics.Color(0xFF10B981), // Emerald 500
+                        modifier = Modifier.size(8.dp)
+                    ) {}
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Active",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                androidx.compose.foundation.layout.Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(Icons.Rounded.MoreVert, contentDescription = "更多选项")
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false }
                     ) {
-                        Text(
-                            text = "Active",
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        DropdownMenuItem(
+                            text = { Text("编辑") },
+                            onClick = {
+                                menuExpanded = false
+                                onEdit()
+                            }
+                        )
+                        if (!isActive) {
+                            DropdownMenuItem(
+                                text = { Text("设为默认") },
+                                onClick = {
+                                    menuExpanded = false
+                                    onSetDefault()
+                                },
+                                enabled = !state.isSettingActive
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text("删除", color = MaterialTheme.colorScheme.error) },
+                            onClick = {
+                                menuExpanded = false
+                                onDelete()
+                            },
+                            enabled = !state.isDeleting
                         )
                     }
                 }
             }
             Text(
                 text = serviceType,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
@@ -390,26 +452,6 @@ private fun ConnectionListItem(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                TextButton(onClick = onEdit) {
-                    Text(if (state.editingConnectionId == connectionId) "编辑中" else "编辑")
-                }
-                TextButton(
-                    enabled = !state.isSettingActive && !isActive,
-                    onClick = onSetDefault
-                ) {
-                    Text("设默认")
-                }
-                TextButton(
-                    enabled = !state.isDeleting,
-                    onClick = onDelete
-                ) {
-                    Text("删除")
-                }
             }
         }
     }
@@ -431,7 +473,7 @@ private fun ConnectionFormContent(
             .padding(horizontal = 20.dp)
             .padding(bottom = 32.dp)
             .navigationBarsPadding(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
             text = if (state.isEditing) "编辑连接" else "新建连接",
@@ -697,9 +739,9 @@ private fun ApiKeySection(
             IconButton(onClick = { apiKeyVisible = !apiKeyVisible }) {
                 Icon(
                     imageVector = if (apiKeyVisible) {
-                        Icons.Filled.VisibilityOff
+                        Icons.Rounded.VisibilityOff
                     } else {
-                        Icons.Filled.Visibility
+                        Icons.Rounded.Visibility
                     },
                     contentDescription = if (apiKeyVisible) "隐藏 API Key" else "显示 API Key"
                 )
@@ -805,9 +847,9 @@ private fun CollapsibleSection(
             )
             Icon(
                 imageVector = if (expanded) {
-                    Icons.Default.KeyboardArrowUp
+                    Icons.Rounded.KeyboardArrowUp
                 } else {
-                    Icons.Default.KeyboardArrowDown
+                    Icons.Rounded.KeyboardArrowDown
                 },
                 contentDescription = if (expanded) "收起" else "展开",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant

@@ -1,5 +1,6 @@
 package com.tenebralis.dreamos.presentation.screens.connection
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tenebralis.dreamos.domain.model.ApiConnection
@@ -248,7 +249,18 @@ class ConnectionViewModel @Inject constructor(
                     }
                 }
                 .onFailure { error ->
-                    _uiState.update { it.copy(errorMessage = mapError(error)) }
+                    // 本地密钥读取失败（keyset 损坏等），静默降级而非弹错误
+                    Log.w(TAG, "读取本地密钥失败，视为无已保存密钥", error)
+                    _uiState.update { current ->
+                        if (current.editingConnectionId != connectionId) return@update current
+                        current.copy(
+                            form = current.form.copy(
+                                apiKey = "",
+                                hasExistingApiKey = false,
+                                existingApiKeyMask = ""
+                            )
+                        )
+                    }
                 }
         }
     }
@@ -290,10 +302,9 @@ class ConnectionViewModel @Inject constructor(
 
             saveResult.fold(
                 onSuccess = { savedConnection ->
-                    // 保存 API Key（仅当用户输入了新 Key 时）
+                    // 保存 API Key（仅当用户显式输入了新 Key 时）
                     val apiKeyToSave = state.form.apiKey
-                    val shouldSaveKey = apiKeyToSave.isNotBlank() ||
-                        (!state.form.hasExistingApiKey && apiKeyToSave.isBlank())
+                    val shouldSaveKey = apiKeyToSave.isNotBlank()
 
                     val secretResult = if (shouldSaveKey) {
                         saveConnectionSecretUseCase(
@@ -304,16 +315,22 @@ class ConnectionViewModel @Inject constructor(
                         Result.success(Unit)
                     }
 
+                    val secretError = secretResult.exceptionOrNull()
                     _uiState.update {
                         it.copy(
                             isSaving = false,
                             editingConnectionId = savedConnection.id,
-                            infoMessage = if (state.isEditing) {
+                            infoMessage = if (secretError != null) {
+                                null
+                            } else if (state.isEditing) {
                                 "连接已更新"
                             } else {
                                 "连接已创建"
                             },
-                            errorMessage = secretResult.exceptionOrNull()?.let(::mapError),
+                            errorMessage = secretError?.let {
+                                val action = if (state.isEditing) "已更新" else "已创建"
+                                "连接${action}，但密钥保存失败: ${mapError(it)}"
+                            },
                             isFormVisible = false
                         )
                     }
@@ -664,5 +681,9 @@ class ConnectionViewModel @Inject constructor(
             message.isNotBlank() -> message
             else -> "操作失败，请稍后重试"
         }
+    }
+
+    private companion object {
+        const val TAG = "ConnectionVM"
     }
 }
