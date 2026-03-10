@@ -13,9 +13,9 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenebralis.dreamos.data.repository.FontManager
 import com.tenebralis.dreamos.domain.model.SessionState
-import com.tenebralis.dreamos.presentation.components.DreamOsSplashScreen
-import com.tenebralis.dreamos.presentation.navigation.DreamOsNavGraph
-import com.tenebralis.dreamos.presentation.theme.DreamOsTheme
+import com.tenebralis.dreamos.presentation.components.TenebralisSplashScreen
+import com.tenebralis.dreamos.presentation.navigation.TenebralisNavGraph
+import com.tenebralis.dreamos.presentation.theme.TenebralisTheme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -31,7 +31,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            DreamOsTheme(fontManager = fontManager) {
+            TenebralisTheme(fontManager = fontManager) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -42,11 +42,11 @@ class MainActivity : ComponentActivity() {
                     when (sessionState) {
                         is SessionState.Loading -> {
                             // Session 加载中 → 显示闪屏
-                            DreamOsSplashScreen()
+                            TenebralisSplashScreen()
                         }
                         else -> {
                             // 已确定认证状态 → 进入导航
-                            DreamOsNavGraph(sessionState = sessionState)
+                            TenebralisNavGraph(sessionState = sessionState)
                         }
                     }
                 }

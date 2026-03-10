@@ -10,32 +10,32 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.text.font.FontFamily
 import com.tenebralis.dreamos.data.repository.FontManager
 
-// DreamOS 浅色配色方案（PRD §12.1：柔蓝 + 白色系背景）
-private val DreamLightColorScheme = lightColorScheme(
-    primary = DreamBlue,
-    onPrimary = DreamOnPrimary,
-    primaryContainer = DreamBlueLight,
-    onPrimaryContainer = DreamOnPrimaryDark,
-    surface = DreamSurface,
-    onSurface = DreamOnPrimaryDark,
-    background = DreamBackground,
-    onBackground = DreamOnPrimaryDark,
-    outline = DreamOutline,
-    error = DreamError,
+// Tenebralis 浅色配色方案（IM 风格，浅色优先）
+private val TenebralisLightColorScheme = lightColorScheme(
+    primary = TenebralisPrimary,
+    onPrimary = TenebralisOnPrimary,
+    primaryContainer = TenebralisPrimaryLight,
+    onPrimaryContainer = TenebralisOnSurface,
+    surface = TenebralisSurface,
+    onSurface = TenebralisOnSurface,
+    background = TenebralisBackground,
+    onBackground = TenebralisOnSurface,
+    outline = TenebralisOutline,
+    error = TenebralisError,
 )
 
-// DreamOS 深色配色方案
-private val DreamDarkColorScheme = darkColorScheme(
-    primary = DreamBlueDark,
-    onPrimary = DreamOnPrimaryDark,
-    primaryContainer = DreamContainerDark,
-    surface = DreamSurfaceDark,
-    background = DreamBackgroundDark,
-    error = DreamError,
+// Tenebralis 深色配色方案
+private val TenebralisDarkColorScheme = darkColorScheme(
+    primary = TenebralisPrimaryDark,
+    onPrimary = TenebralisOnPrimaryDark,
+    primaryContainer = TenebralisContainerDark,
+    surface = TenebralisSurfaceDark,
+    background = TenebralisBackgroundDark,
+    error = TenebralisError,
 )
 
 /**
- * DreamOS 主题
+ * Tenebralis 主题
  *
  * 接入 FontManager 实现字体热切换：
  * - displayFont：全局显示字体
@@ -46,19 +46,19 @@ private val DreamDarkColorScheme = darkColorScheme(
  * @param content 主题内的 Composable 内容
  */
 @Composable
-fun DreamOsTheme(
+fun TenebralisTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     fontManager: FontManager? = null,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DreamDarkColorScheme else DreamLightColorScheme
+    val colorScheme = if (darkTheme) TenebralisDarkColorScheme else TenebralisLightColorScheme
 
     val displayFont by fontManager?.currentDisplayFontFamily?.collectAsState()
         ?: androidx.compose.runtime.mutableStateOf(FontFamily.Default)
     val codeFont by fontManager?.currentCodeFontFamily?.collectAsState()
         ?: androidx.compose.runtime.mutableStateOf(FontFamily.Monospace)
 
-    val typography = createDreamTypography(
+    val typography = createTenebralisTypography(
         displayFont = displayFont,
         codeFont = codeFont
     )
@@ -66,7 +66,7 @@ fun DreamOsTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = typography,
-        shapes = DreamShapes,
+        shapes = TenebralisShapes,
         content = content
     )
 }

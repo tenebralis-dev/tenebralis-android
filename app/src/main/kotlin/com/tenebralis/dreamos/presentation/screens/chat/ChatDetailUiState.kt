@@ -25,7 +25,8 @@ data class ChatDetailUiState(
     val currentPresetId: String? = null,
     val currentPresetName: String? = null,
     val currentConnectionId: String? = null,
-    val currentConnectionName: String? = null
+    val currentConnectionName: String? = null,
+    val npcName: String? = null
 ) {
     val emptyState: Boolean get() = !isLoading && messages.isEmpty()
 }

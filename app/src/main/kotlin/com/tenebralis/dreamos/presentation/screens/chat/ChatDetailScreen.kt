@@ -4,17 +4,22 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -54,9 +59,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.tenebralis.dreamos.presentation.theme.*
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tenebralis.dreamos.domain.model.AiPreset
@@ -135,10 +144,35 @@ fun ChatDetailScreen(
         )
     }
 
+    // 设置摘要作为 TopAppBar 副标题
+    val settingSummary = buildSettingSummary(
+        presetName = uiState.currentPresetName,
+        connectionName = uiState.currentConnectionName
+    )
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("对话详情") },
+                title = {
+                    Column {
+                        Text(
+                            text = uiState.npcName ?: "对话",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (settingSummary.isNotEmpty()) {
+                            Text(
+                                text = settingSummary,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(
@@ -148,17 +182,10 @@ fun ChatDetailScreen(
                     }
                 },
                 actions = {
-                    // 设置按钮
                     IconButton(onClick = { viewModel.onEvent(ChatDetailEvent.ShowSettings) }) {
                         Icon(
                             imageVector = Icons.Filled.Settings,
                             contentDescription = "设置"
-                        )
-                    }
-                    IconButton(onClick = { viewModel.onEvent(ChatDetailEvent.Refresh) }) {
-                        Icon(
-                            imageVector = Icons.Filled.Refresh,
-                            contentDescription = "刷新"
                         )
                     }
                 }
@@ -168,202 +195,223 @@ fun ChatDetailScreen(
             SnackbarHost(hostState = snackbarHostState) { data ->
                 Snackbar(snackbarData = data)
             }
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-        ) {
-            // 当前设置摘要条
-            val settingSummary = buildSettingSummary(
-                presetName = uiState.currentPresetName,
-                connectionName = uiState.currentConnectionName
-            )
-            if (settingSummary.isNotEmpty()) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp)
-                        .clickable { viewModel.onEvent(ChatDetailEvent.ShowSettings) },
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
-                    )
-                ) {
-                    Text(
-                        text = settingSummary,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                    )
-                }
-            }
-
-            if (uiState.isLoading) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    Spacer(modifier = Modifier.padding(horizontal = 6.dp))
-                    Text(
-                        text = "正在加载消息...",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            if (uiState.emptyState) {
-                EmptyMessageCard()
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    state = listState,
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(
-                        items = uiState.messages,
-                        key = { it.id }
-                    ) { message ->
-                        MessageItemCard(message = message)
-                    }
-
-                    // 流式 assistant 气泡
-                    uiState.streamingContent?.let { streamingText ->
-                        item(key = "streaming_bubble") {
-                            StreamingMessageBubble(text = streamingText)
-                        }
-                    }
-                }
-            }
-
-            // AI 正在回复指示器
-            AnimatedVisibility(
-                visible = uiState.isAiResponding && uiState.streamingContent == null,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                    Spacer(modifier = Modifier.padding(horizontal = 6.dp))
-                    Text(
-                        text = "AI 正在回复...",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                }
-            }
-
-            // AI 错误提示 + 重试按钮
-            uiState.aiErrorMessage?.let { aiError ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
-                    )
-                ) {
+        },
+        bottomBar = {
+            // ── Telegram 风格输入栏 ──
+            Column {
+                // AI 错误提示
+                uiState.aiErrorMessage?.let { aiError ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                            .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f))
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = aiError,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
                         TextButton(
                             onClick = { viewModel.onEvent(ChatDetailEvent.RetryAiCall) }
                         ) {
-                            Text("重试")
+                            Text("重试", style = MaterialTheme.typography.labelMedium)
                         }
                         TextButton(
                             onClick = { viewModel.onEvent(ChatDetailEvent.ClearAiError) }
                         ) {
-                            Text("忽略")
+                            Text("忽略", style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
-            }
 
-            HorizontalDivider(
-                modifier = Modifier.padding(top = 10.dp, bottom = 10.dp),
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-            )
-
-            if (!uiState.failedContent.isNullOrBlank()) {
-                TextButton(
-                    enabled = !uiState.isSending && !uiState.isAiResponding,
-                    onClick = { viewModel.onEvent(ChatDetailEvent.RetrySend) }
-                ) {
-                    Text("重试上次发送失败的消息")
+                // 重试提示
+                if (!uiState.failedContent.isNullOrBlank()) {
+                    TextButton(
+                        enabled = !uiState.isSending && !uiState.isAiResponding,
+                        onClick = { viewModel.onEvent(ChatDetailEvent.RetrySend) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("重试上次发送失败的消息", style = MaterialTheme.typography.labelMedium)
+                    }
                 }
-            }
 
-            OutlinedTextField(
-                value = uiState.inputText,
-                onValueChange = { value -> viewModel.onEvent(ChatDetailEvent.InputChanged(value)) },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("输入消息") },
-                maxLines = 4,
-                enabled = !uiState.isSending && !uiState.isAiResponding,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(
-                    onSend = { viewModel.onEvent(ChatDetailEvent.Send) }
-                ),
-                trailingIcon = {
+                // AI 回复中提示
+                AnimatedVisibility(
+                    visible = uiState.isAiResponding && uiState.streamingContent == null,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(12.dp),
+                            strokeWidth = 1.5.dp,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "正在输入...",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                // 输入栏
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    // 输入框
+                    OutlinedTextField(
+                        value = uiState.inputText,
+                        onValueChange = { value -> viewModel.onEvent(ChatDetailEvent.InputChanged(value)) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp),
+                        placeholder = { Text("输入消息...") },
+                        maxLines = 4,
+                        enabled = !uiState.isSending && !uiState.isAiResponding,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                        keyboardActions = KeyboardActions(
+                            onSend = { viewModel.onEvent(ChatDetailEvent.Send) }
+                        ),
+                        shape = RoundedCornerShape(24.dp)
+                    )
+
+                    // 发送/停止按钮
                     if (uiState.isAiResponding) {
                         IconButton(
-                            onClick = { viewModel.onEvent(ChatDetailEvent.StopStreaming) }
+                            onClick = { viewModel.onEvent(ChatDetailEvent.StopStreaming) },
+                            modifier = Modifier.size(44.dp)
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(18.dp)
+                                    .size(20.dp)
                                     .background(
                                         color = MaterialTheme.colorScheme.error,
-                                        shape = RoundedCornerShape(3.dp)
+                                        shape = RoundedCornerShape(4.dp)
                                     )
                             )
                         }
                     } else {
                         IconButton(
-                            enabled = !uiState.isSending,
-                            onClick = { viewModel.onEvent(ChatDetailEvent.Send) }
+                            enabled = !uiState.isSending && uiState.inputText.isNotBlank(),
+                            onClick = { viewModel.onEvent(ChatDetailEvent.Send) },
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(
+                                    color = if (uiState.inputText.isNotBlank())
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = CircleShape
+                                )
                         ) {
                             if (uiState.isSending) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp
+                                    strokeWidth = 2.dp,
+                                    color = Color.White
                                 )
                             } else {
                                 Icon(
                                     imageVector = Icons.Filled.Send,
-                                    contentDescription = "发送"
+                                    contentDescription = "发送",
+                                    tint = if (uiState.inputText.isNotBlank())
+                                        Color.White
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     }
                 }
-            )
+            }
+        }
+    ) { innerPadding ->
+        // ── 消息列表区域 ──
+        if (uiState.isLoading && uiState.messages.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(32.dp), strokeWidth = 2.dp)
+            }
+        } else if (uiState.emptyState) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "开始对话吧",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                    Text(
+                        text = "输入消息并发送，AI 将会回复你",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                    )
+                }
+            }
+        } else {
+            val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
+            val maxBubbleWidth = screenWidthDp * 0.85f
+            val isDark = isSystemInDarkTheme()
+
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(horizontal = 8.dp),
+                state = listState,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                contentPadding = PaddingValues(vertical = 8.dp)
+            ) {
+                items(
+                    items = uiState.messages,
+                    key = { it.id }
+                ) { message ->
+                    ChatBubble(
+                        message = message,
+                        maxWidth = maxBubbleWidth,
+                        isDark = isDark
+                    )
+                }
+
+                // 流式 assistant 气泡
+                uiState.streamingContent?.let { streamingText ->
+                    item(key = "streaming_bubble") {
+                        StreamingChatBubble(
+                            text = streamingText,
+                            maxWidth = maxBubbleWidth,
+                            isDark = isDark
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -514,139 +562,136 @@ private fun SettingsOptionCard(
     }
 }
 
-// ─── 消息子组件 ──────────────────────────────────────────
+// ─── IM 聊天气泡 ──────────────────────────────────────────
 
 @Composable
-private fun MessageItemCard(message: ConversationMessage) {
+private fun ChatBubble(
+    message: ConversationMessage,
+    maxWidth: androidx.compose.ui.unit.Dp,
+    isDark: Boolean
+) {
     val isUser = message.role == MessageRole.USER
-    val containerColor = when (message.role) {
-        MessageRole.USER -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
-        MessageRole.ASSISTANT -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f)
-        MessageRole.SYSTEM -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.45f)
-        MessageRole.TOOL -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+    val isSystem = message.role == MessageRole.SYSTEM || message.role == MessageRole.TOOL
+
+    val bubbleColor = when {
+        isUser -> if (isDark) ChatBubbleUserDark else ChatBubbleUser
+        isSystem -> if (isDark) ChatBubbleSystemDark else ChatBubbleSystem
+        else -> if (isDark) ChatBubbleAiDark else ChatBubbleAi
     }
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
-    ) {
-        Card(
-            modifier = Modifier.fillMaxWidth(0.88f),
-            colors = CardDefaults.cardColors(containerColor = containerColor)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = roleLabel(message.role),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        text = "seq ${message.seq}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Text(
-                    text = message.content,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                message.createdAt?.takeIf { it.isNotBlank() }?.let { createdAt ->
-                    Text(
-                        text = createdAt.take(19),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun StreamingMessageBubble(text: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Start
-    ) {
-        Card(
-            modifier = Modifier.fillMaxWidth(0.88f),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f)
-            )
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "助手",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f)
-                    )
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(12.dp),
-                        strokeWidth = 1.5.dp,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "输入中",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                }
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun EmptyMessageCard() {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+    val bubbleShape = when {
+        isUser -> RoundedCornerShape(
+            topStart = 18.dp, topEnd = 4.dp,
+            bottomStart = 18.dp, bottomEnd = 18.dp
         )
+        else -> RoundedCornerShape(
+            topStart = 4.dp, topEnd = 18.dp,
+            bottomStart = 18.dp, bottomEnd = 18.dp
+        )
+    }
+
+    // 时间戳 HH:mm
+    val timestamp = message.createdAt
+        ?.takeIf { it.length >= 16 }
+        ?.substring(11, 16)
+        ?: ""
+
+    // 系统消息居中显示
+    if (isSystem) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = message.content,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier
+                    .background(
+                        color = bubbleColor,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
+            )
+        }
+        return
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .widthIn(max = maxWidth)
+                .background(color = bubbleColor, shape = bubbleShape)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
         ) {
             Text(
-                text = "暂无消息",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = "输入消息并发送后，AI 将会回复你。",
+                text = message.content,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurface
             )
+            if (timestamp.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = timestamp,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+            }
         }
     }
 }
 
-private fun roleLabel(role: MessageRole): String {
-    return when (role) {
-        MessageRole.USER -> "用户"
-        MessageRole.ASSISTANT -> "助手"
-        MessageRole.SYSTEM -> "系统"
-        MessageRole.TOOL -> "工具"
+@Composable
+private fun StreamingChatBubble(
+    text: String,
+    maxWidth: androidx.compose.ui.unit.Dp,
+    isDark: Boolean
+) {
+    val bubbleColor = if (isDark) ChatBubbleAiDark else ChatBubbleAi
+    val bubbleShape = RoundedCornerShape(
+        topStart = 4.dp, topEnd = 18.dp,
+        bottomStart = 18.dp, bottomEnd = 18.dp
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.Start
+    ) {
+        Column(
+            modifier = Modifier
+                .widthIn(max = maxWidth)
+                .background(color = bubbleColor, shape = bubbleShape)
+                .padding(horizontal = 14.dp, vertical = 10.dp)
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(10.dp),
+                    strokeWidth = 1.5.dp,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "输入中",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+            }
+        }
     }
 }

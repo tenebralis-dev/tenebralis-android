@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.tenebralis.dreamos.domain.repository.AiPresetRepository
 import com.tenebralis.dreamos.domain.repository.ApiConnectionRepository
 import com.tenebralis.dreamos.domain.repository.ConversationRepository
+import com.tenebralis.dreamos.domain.repository.NpcRepository
 import com.tenebralis.dreamos.domain.usecase.chat.GetMessagesUseCase
 import com.tenebralis.dreamos.domain.usecase.chat.SendMessageUseCase
 import com.tenebralis.dreamos.domain.usecase.chat.StreamEvent
@@ -29,6 +30,7 @@ class ChatDetailViewModel @Inject constructor(
     private val getMessagesUseCase: GetMessagesUseCase,
     private val sendMessageUseCase: SendMessageUseCase,
     private val conversationRepository: ConversationRepository,
+    private val npcRepository: NpcRepository,
     private val aiPresetRepository: AiPresetRepository,
     private val apiConnectionRepository: ApiConnectionRepository
 ) : ViewModel() {
@@ -126,6 +128,11 @@ class ChatDetailViewModel @Inject constructor(
                 connections.firstOrNull { it.id == cid }
             }
 
+            // 加载 NPC 名称
+            val npcName = runCatching {
+                npcRepository.getById(conversation.npcId).getOrThrow().name
+            }.getOrNull()
+
             _uiState.update {
                 it.copy(
                     availablePresets = presets,
@@ -133,7 +140,8 @@ class ChatDetailViewModel @Inject constructor(
                     currentPresetId = conversation.presetId,
                     currentPresetName = currentPreset?.name,
                     currentConnectionId = conversation.apiConnectionId,
-                    currentConnectionName = currentConnection?.name
+                    currentConnectionName = currentConnection?.name,
+                    npcName = npcName
                 )
             }
         }

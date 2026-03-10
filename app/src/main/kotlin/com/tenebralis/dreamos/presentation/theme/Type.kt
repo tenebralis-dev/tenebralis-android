@@ -7,11 +7,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 /**
- * DreamOS 排版系统
+ * Tenebralis 排版系统
  *
  * 支持自定义字体注入：displayFont 用于全局显示，codeFont 用于代码区域。
  */
-fun createDreamTypography(
+fun createTenebralisTypography(
     displayFont: FontFamily = FontFamily.Default,
     codeFont: FontFamily = FontFamily.Monospace
 ): Typography = Typography(
@@ -123,4 +123,4 @@ fun createDreamTypography(
 )
 
 // 默认 Typography（向后兼容）
-val DreamTypography = createDreamTypography()
+val TenebralisTypography = createTenebralisTypography()

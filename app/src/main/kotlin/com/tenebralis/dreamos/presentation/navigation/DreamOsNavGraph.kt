@@ -17,7 +17,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.tenebralis.dreamos.domain.model.SessionState
-import com.tenebralis.dreamos.presentation.screens.home.HomeScreen
+import com.tenebralis.dreamos.presentation.screens.main.TenebralisMainScreen
 import com.tenebralis.dreamos.presentation.screens.auth.AuthScreen
 import com.tenebralis.dreamos.presentation.screens.chat.ChatDetailScreen
 import com.tenebralis.dreamos.presentation.screens.chat.ChatListScreen
@@ -30,20 +30,20 @@ import com.tenebralis.dreamos.presentation.screens.settings.SettingsScreen
 import com.tenebralis.dreamos.presentation.screens.world.WorldScreen
 
 /**
- * DreamOS 导航图
+ * Tenebralis 导航图
  *
  * 根据 [sessionState] 控制路由跳转：
- * - Authenticated → Home
+ * - Authenticated → Main（IM 风格底部 Tab）
  * - NotAuthenticated → Auth
  */
 @Composable
-fun DreamOsNavGraph(
+fun TenebralisNavGraph(
     sessionState: SessionState,
     navController: NavHostController = rememberNavController()
 ) {
     // 根据认证状态决定起始路由
     val startDestination = when (sessionState) {
-        is SessionState.Authenticated -> Screen.Home.route
+        is SessionState.Authenticated -> Screen.Main.route
         else -> Screen.Auth.route
     }
 
@@ -55,9 +55,10 @@ fun DreamOsNavGraph(
             AuthScreen()
         }
 
-        composable(Screen.Home.route) {
-            HomeScreen(
-                onRouteNavigate = { route ->
+        // ─── Tenebralis 主界面（底部 4 Tab）──────────────────
+        composable(Screen.Main.route) {
+            TenebralisMainScreen(
+                onNavigateRoute = { route ->
                     navController.navigate(route) {
                         launchSingleTop = true
                     }
@@ -183,21 +184,21 @@ fun DreamOsNavGraph(
                 onBackClick = { navController.popBackStack() }
             )
         }
-        // ─── 任务（M7）──────────────────────────────────────
+        // ─── 任务 ──────────────────────────────────────
         composable(Screen.Task.route) {
             com.tenebralis.dreamos.presentation.screens.task.TaskScreen(
                 onBack = { navController.popBackStack() }
             )
         }
 
-        // ─── 成就（M7）──────────────────────────────────────
+        // ─── 成就 ──────────────────────────────────────
         composable(Screen.Achievement.route) {
             com.tenebralis.dreamos.presentation.screens.achievement.AchievementScreen(
                 onBack = { navController.popBackStack() }
             )
         }
 
-        // ─── 好感度（M7）────────────────────────────────────
+        // ─── 好感度 ────────────────────────────────────
         composable(
             route = Screen.Affinity.route,
             arguments = listOf(
@@ -224,35 +225,35 @@ fun DreamOsNavGraph(
             )
         }
 
-        // ─── 备忘管理（M6）──────────────────────────────────
+        // ─── 备忘管理 ──────────────────────────────────
         composable(Screen.Notes.route) {
             com.tenebralis.dreamos.presentation.screens.notes.NoteScreen(
                 onBackClick = { navController.popBackStack() }
             )
         }
 
-        // ─── 日历管理（M6）──────────────────────────────────
+        // ─── 日历管理 ──────────────────────────────────
         composable(Screen.Calendar.route) {
             com.tenebralis.dreamos.presentation.screens.calendar.CalendarScreen(
                 onBackClick = { navController.popBackStack() }
             )
         }
 
-        // ─── 番茄钟（M6）────────────────────────────────────
+        // ─── 番茄钟 ────────────────────────────────────
         composable(Screen.Pomodoro.route) {
             com.tenebralis.dreamos.presentation.screens.pomodoro.PomodoroScreen(
                 onBackClick = { navController.popBackStack() }
             )
         }
 
-        // ─── 钱包（M7.5）──────────────────────────────────────
+        // ─── 钱包 ──────────────────────────────────────
         composable(Screen.Wallet.route) {
             com.tenebralis.dreamos.presentation.screens.wallet.WalletScreen(
                 onBackClick = { navController.popBackStack() }
             )
         }
 
-        // ─── 论坛（M7.5）──────────────────────────────────────
+        // ─── 论坛 ──────────────────────────────────────
         composable(Screen.Forum.route) {
             com.tenebralis.dreamos.presentation.screens.forum.ForumScreen(
                 onBack = { navController.popBackStack() },
@@ -288,7 +289,7 @@ fun DreamOsNavGraph(
             )
         }
 
-        // ─── 商店（M7.5）──────────────────────────────────────
+        // ─── 商店 ──────────────────────────────────────
         composable(Screen.Shop.route) {
             com.tenebralis.dreamos.presentation.screens.shop.ShopScreen(
                 onBack = { navController.popBackStack() }
@@ -307,7 +308,7 @@ fun DreamOsNavGraph(
             )
         }
 
-        // ─── 字体选择（自定义模块）────────────────────────────────
+        // ─── 字体选择 ────────────────────────────────────────
         composable(Screen.FontPicker.route) {
             com.tenebralis.dreamos.presentation.screens.font.FontPickerScreen(
                 onBack = { navController.popBackStack() }
@@ -340,7 +341,7 @@ fun DreamOsNavGraph(
             )
         }
 
-        // ─── 预设管理（兼容 SillyTavern 预设）───────────────────────
+        // ─── 预设管理 ───────────────────────────────────────
         composable(Screen.Preset.route) {
             com.tenebralis.dreamos.presentation.screens.preset.PresetListScreen(
                 onBackClick = { navController.popBackStack() },
@@ -413,7 +414,7 @@ fun DreamOsNavGraph(
     LaunchedEffect(sessionState) {
         when (sessionState) {
             is SessionState.Authenticated -> {
-                navController.navigate(Screen.Home.route) {
+                navController.navigate(Screen.Main.route) {
                     popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
                     launchSingleTop = true
                 }

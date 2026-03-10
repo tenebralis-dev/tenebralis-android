@@ -12,8 +12,8 @@ sealed class Screen(val route: String) {
     /** 认证页面（登录/注册/OTP） */
     data object Auth : Screen("auth")
 
-    /** DreamOS 主界面（B3 实现） */
-    data object Home : Screen("home")
+    /** Tenebralis 主界面（IM 风格底部 Tab） */
+    data object Main : Screen("main")
 
     /** 梦境入口（自动续梦 → 世界选择） */
     data object DreamEntry : Screen("dream_entry")

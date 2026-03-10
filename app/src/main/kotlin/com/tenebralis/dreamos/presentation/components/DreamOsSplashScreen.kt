@@ -17,12 +17,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 /**
- * DreamOS 启动闪屏
+ * Tenebralis 启动闪屏
  *
  * 在 session 从本地存储加载期间显示。
  */
 @Composable
-fun DreamOsSplashScreen() {
+fun TenebralisSplashScreen() {
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -40,7 +40,7 @@ fun DreamOsSplashScreen() {
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Dream OS",
+                text = "Tenebralis",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
