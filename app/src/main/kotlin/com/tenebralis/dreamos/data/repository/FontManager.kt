@@ -57,6 +57,10 @@ class FontManager @Inject constructor(
     }
 
     private suspend fun loadFontFamily(fontId: String?, category: FontCategory): FontFamily {
+        if (fontId == FontRepositoryImpl.SYSTEM_FONT_ID) {
+            return if (category == FontCategory.CODE) FontFamily.Monospace
+            else FontFamily.Default
+        }
         if (fontId == null || fontId == FontRepositoryImpl.BUILT_IN_FONT_ID) {
             return if (category == FontCategory.CODE) FontFamily.Monospace
             else loadBuiltInFont()

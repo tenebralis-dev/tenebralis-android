@@ -124,6 +124,9 @@ class AuthRepositoryImpl @Inject constructor(
     override fun getCurrentUserId(): String? =
         supabase.auth.currentUserOrNull()?.id
 
+    override fun getCurrentUserEmail(): String? =
+        supabase.auth.currentUserOrNull()?.email
+
     // #region agent log
     private fun debugLog(
         runId: String,

@@ -55,6 +55,20 @@ class FontRepositoryImpl @Inject constructor(
 
     override fun getBuiltInFonts(): List<FontItem> = listOf(
         FontItem(
+            id = SYSTEM_FONT_ID,
+            displayName = "系统默认",
+            fileName = "",
+            fileSize = 0,
+            style = "使用手机系统自带字体",
+            category = FontCategory.DISPLAY,
+            tags = listOf("系统"),
+            sortOrder = -2,
+            isVariable = false,
+            preview = "春江潮水连海平",
+            source = FontSource.SYSTEM,
+            isDownloaded = true
+        ),
+        FontItem(
             id = BUILT_IN_FONT_ID,
             displayName = "Noto Sans SC",
             fileName = BUILT_IN_FILE_NAME,
@@ -276,6 +290,7 @@ class FontRepositoryImpl @Inject constructor(
     }
 
     companion object {
+        const val SYSTEM_FONT_ID = "system-default"
         const val BUILT_IN_FONT_ID = "noto-sans-sc"
         const val BUILT_IN_FILE_NAME = "NotoSansSC-Regular.ttf"
         const val FONTS_JSON_URL = "https://fonts.tenebralis-dream.com/fonts.json"

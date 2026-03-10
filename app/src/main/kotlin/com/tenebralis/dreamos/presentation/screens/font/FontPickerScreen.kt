@@ -216,6 +216,21 @@ fun FontPickerScreen(
                     val grouped = uiState.fonts.groupBy { it.source }
 
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // 系统字体
+                        grouped[FontSource.SYSTEM]?.let { fonts ->
+                            item { SectionHeader("📱 系统字体") }
+                            items(fonts, key = { it.id }) { font ->
+                                FontCard(
+                                    item = font,
+                                    isSelected = uiState.selectedFontId == font.id,
+                                    downloadProgress = null,
+                                    onSelect = { viewModel.onEvent(FontPickerEvent.SelectFont(font.id)) },
+                                    onDownload = { },
+                                    onLongPress = { /* 系统字体不可删除 */ }
+                                )
+                            }
+                        }
+
                         // 内置字体
                         grouped[FontSource.BUILT_IN]?.let { fonts ->
                             item { SectionHeader("📦 内置字体") }
@@ -297,13 +312,14 @@ private fun FontCard(
     onLongPress: () -> Unit
 ) {
     val isDownloading = downloadProgress != null
-    val canSelect = item.isDownloaded || item.source == FontSource.BUILT_IN
+    val canSelect = item.isDownloaded || item.source == FontSource.BUILT_IN || item.source == FontSource.SYSTEM
 
     // 尝试加载字体用于预览
     val context = LocalContext.current
     val previewFontFamily: FontFamily? = remember(item.id, item.isDownloaded) {
         if (!canSelect) null
         else when (item.source) {
+            FontSource.SYSTEM -> FontFamily.Default
             FontSource.BUILT_IN -> {
                 try {
                     // 将 assets 字体复制到缓存后通过 Font(File) 加载

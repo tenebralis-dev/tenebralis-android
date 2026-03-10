@@ -44,4 +44,7 @@ interface AuthRepository {
 
     /** 获取当前用户 ID（未登录返回 null） */
     fun getCurrentUserId(): String?
+
+    /** 获取当前用户邮箱（未登录返回 null） */
+    fun getCurrentUserEmail(): String?
 }

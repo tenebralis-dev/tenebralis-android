@@ -5,4 +5,6 @@ sealed interface SettingsEvent {
     data object DismissLogoutDialog : SettingsEvent
     data object ConfirmLogout : SettingsEvent
     data object ClearError : SettingsEvent
+    data object ShowAgreementDialog : SettingsEvent
+    data object DismissAgreementDialog : SettingsEvent
 }
