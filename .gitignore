@@ -44,3 +44,6 @@ prd/
 
 # Wrangler
 .wrangler/
+
+# Agent
+.agent/
