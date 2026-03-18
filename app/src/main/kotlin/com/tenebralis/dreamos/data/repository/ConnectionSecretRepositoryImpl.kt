@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.tenebralis.dreamos.data.repository
 
 import android.content.Context

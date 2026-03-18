@@ -15,7 +15,7 @@ import javax.inject.Inject
  * - GIF 动图不做压缩，直接返回原始字节
  */
 class ImageCompressor @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) {
 
     private val contentResolver get() = context.contentResolver

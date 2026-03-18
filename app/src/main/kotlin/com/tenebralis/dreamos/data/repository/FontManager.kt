@@ -28,7 +28,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class FontManager @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val fontRepository: FontRepository
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)

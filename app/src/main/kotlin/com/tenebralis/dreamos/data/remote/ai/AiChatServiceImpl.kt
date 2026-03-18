@@ -34,7 +34,7 @@ import kotlinx.serialization.json.jsonPrimitive
  * 使用专用 [AiHttpClient] 限定的长超时 HttpClient。
  */
 class AiChatServiceImpl @Inject constructor(
-    @AiHttpClient private val httpClient: HttpClient
+    @param:AiHttpClient private val httpClient: HttpClient
 ) : AiChatService {
 
     private val json = Json {
